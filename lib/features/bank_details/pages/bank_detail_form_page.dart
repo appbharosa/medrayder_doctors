@@ -162,7 +162,7 @@ class _BankDetailFormPageState extends State<BankDetailFormPage> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _accountType,
+                        initialValue: _accountType,
                         decoration: InputDecoration(
                           labelText: 'Account Type',
                           labelStyle: const TextStyle(

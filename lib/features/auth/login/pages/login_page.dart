@@ -110,7 +110,7 @@ class _LoginPageState extends State<LoginPage> {
                             Container(
                               padding: const EdgeInsets.all(18),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
+                                color: Colors.white.withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
                               child: SvgPicture.asset(
@@ -159,7 +159,7 @@ class _LoginPageState extends State<LoginPage> {
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
+                                color: Colors.black.withValues(alpha: 0.08),
                                 blurRadius: 15,
                                 offset: const Offset(0, 5),
                               ),
@@ -354,7 +354,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),

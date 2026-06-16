@@ -6,8 +6,6 @@ import '../bloc/doctor_profile_bloc.dart';
 import '../bloc/doctor_profile_event.dart';
 import '../bloc/doctor_profile_state.dart';
 
-
-
 class EditProfilePage extends StatefulWidget {
   final DoctorProfileModel profile;
   final DoctorProfileBloc bloc;
@@ -127,7 +125,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _consultTypeController.text,
+                        initialValue: _consultTypeController.text,
                         decoration: InputDecoration(
                           labelText: 'Consultation Type',
                           labelStyle: const TextStyle(

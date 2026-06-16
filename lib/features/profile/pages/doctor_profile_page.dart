@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/di/injection.dart' as di;
 import '../../../data/models/doctor_profile_model.dart';
 import '../bloc/doctor_profile_bloc.dart';
@@ -258,27 +257,4 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     );
   }
 
-  void _navigateToEdit(BuildContext context) {
-    final bloc = context.read<DoctorProfileBloc>();
-    final state = bloc.state;
-    if (state is DoctorProfileLoaded) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => EditProfilePage(profile: state.profile, bloc: bloc),
-        ),
-      ).then((_) {
-        bloc.add(FetchDoctorProfile());
-      });
-    } else {
-      // If not loaded, show a snackbar or loading indicator
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please wait, profile is loading...'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
 }

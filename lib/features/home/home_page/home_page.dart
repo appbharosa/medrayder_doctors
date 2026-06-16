@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/di/injection.dart' as di;
 import '../../../core/manager/user_manager.dart';
 import '../../../data/models/dashboard_response_model.dart';
+import '../../auth/login/pages/login_page.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -504,9 +505,111 @@ class _HomePageState extends State<HomePage> {
                 }),
                 const Divider(),
                 _drawerItem(Icons.logout, "Logout", () async {
-                  // Clear session
-                  await di.sl<UserManager>().clearUser();
-                  Navigator.pushReplacementNamed(context, '/login');
+                  // Close the drawer first
+                  Navigator.pop(context);
+
+                  // Show custom logout confirmation dialog with Container buttons
+                  final shouldLogout = await showDialog<bool>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => Dialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 8,
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Title
+                            const Text(
+                              'Logout',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            // Message
+                            const Text(
+                              'Are you sure you want to logout?',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            // Buttons row (Container-based)
+                            Row(
+                              children: [
+                                // Cancel Button
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.pop(context, false),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: Text(
+                                          'Cancel',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Logout Button
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.pop(context, true),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: Text(
+                                          'Logout',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+
+                  // If user confirmed logout
+                  if (shouldLogout == true) {
+                    // Clear session
+                    await di.sl<UserManager>().clearUser();
+
+                    // Navigate to LoginPage using MaterialPageRoute
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                    );
+                  }
                 }, isRed: true),
               ],
             ),

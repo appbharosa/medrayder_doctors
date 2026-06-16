@@ -7,9 +7,6 @@ import '../bloc/bank_detail_event.dart';
 import '../bloc/bank_detail_state.dart';
 import 'bank_detail_form_page.dart';
 
-
-
-
 class BankAccountScreen extends StatefulWidget {
   const BankAccountScreen({super.key});
 

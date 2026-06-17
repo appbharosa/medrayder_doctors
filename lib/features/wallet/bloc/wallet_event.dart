@@ -9,19 +9,21 @@ abstract class WalletEvent extends Equatable {
 
 class FetchWalletHistory extends WalletEvent {
   final int doctorId;
+  final String type;
   final String? startDate;
   final String? endDate;
   final String? transactionType;
 
   const FetchWalletHistory({
     required this.doctorId,
+    required this.type,
     this.startDate,
     this.endDate,
     this.transactionType,
   });
 
   @override
-  List<Object?> get props => [doctorId, startDate, endDate, transactionType];
+  List<Object?> get props => [doctorId, type,startDate, endDate, transactionType];
 }
 
 class RequestWalletDebit extends WalletEvent {

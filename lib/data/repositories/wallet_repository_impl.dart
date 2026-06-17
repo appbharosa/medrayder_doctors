@@ -12,12 +12,14 @@ class WalletRepositoryImpl implements WalletRepository {
   @override
   Future<WalletResponseModel> getWalletHistory({
     required int doctorId,
+    required String type,
     String? startDate,
     String? endDate,
     String? transactionType,
   }) {
     return apiService.getWalletHistory(
       doctorId: doctorId,
+      type: type,
       startDate: startDate,
       endDate: endDate,
       transactionType: transactionType,

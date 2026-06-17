@@ -7,8 +7,14 @@ class AppUrls {
   static const String bankDetails = 'doctor/bank-details';
   static const String addBankDetails = 'doctor/bank-details';
   static const String updateBankDetails = 'doctor/bank-details';
-  static const String walletHistory="doctor/wallet/history?doctor_id=1&start_date=2026-01-01&end_date=2026-03-25&transaction_type=all&type=offline";
+  static const String walletHistory = "doctor/wallet/history";
   static const String walletDebit="doctor/wallet/debit";
   static const String doctorProfile="doctor/profile";
   static const String updateProfile="doctor/update-profile";
+  static const String getNotifications = 'doctor/notifications-list';
+  static const String readNotifications = 'doctor/read-notification';
+  static const String activeAppointments = 'doctor/active-booking-history';
+  static const String createRoom="doctor/create-room";
+  static const String joinRoom="doctor/join-room";
+  static const String getRoomDetails="doctor/room-details/6a2ba66a2405f1ebbcf6c639";
 }

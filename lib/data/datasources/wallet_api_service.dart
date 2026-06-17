@@ -12,6 +12,7 @@ class WalletApiService {
 
   Future<WalletResponseModel> getWalletHistory({
     required int doctorId,
+    required String type,  // ✅ new required parameter
     String? startDate,
     String? endDate,
     String? transactionType,
@@ -19,6 +20,7 @@ class WalletApiService {
     try {
       final queryParams = <String, dynamic>{
         'doctor_id': doctorId,
+        'type': type,  // ✅ added
         if (startDate != null && startDate.isNotEmpty) 'start_date': startDate,
         if (endDate != null && endDate.isNotEmpty) 'end_date': endDate,
         if (transactionType != null && transactionType.isNotEmpty) 'transaction_type': transactionType,

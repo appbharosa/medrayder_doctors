@@ -33,6 +33,7 @@ class _WalletHistoryPageState extends State<WalletHistoryPage> {
     if (user != null) {
       _bloc.add(FetchWalletHistory(
         doctorId: user.id,
+        type: user.type,
         startDate: _startDateController.text.isNotEmpty ? _startDateController.text : null,
         endDate: _endDateController.text.isNotEmpty ? _endDateController.text : null,
         transactionType: _selectedType == 'all' ? null : _selectedType,

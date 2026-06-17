@@ -17,6 +17,7 @@ class WalletBloc extends Bloc<WalletEvent, WalletState> {
     try {
       final data = await repository.getWalletHistory(
         doctorId: event.doctorId,
+        type: event.type,
         startDate: event.startDate,
         endDate: event.endDate,
         transactionType: event.transactionType,

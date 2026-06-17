@@ -8,7 +8,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/di/injection.dart' as di;
 import '../../../core/manager/user_manager.dart';
 import '../../../data/models/dashboard_response_model.dart';
+import '../../appointments/pages/appointments_screen.dart';
 import '../../auth/login/pages/login_page.dart';
+import '../../notification/bloc/notification_bloc.dart';
+import '../../notification/bloc/notification_event.dart';
+import '../../notification/bloc/notification_state.dart';
+import '../../notification/pages/notification_page.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
@@ -22,6 +27,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final DashboardBloc _dashboardBloc;
+  int _unreadCount = 0;
 
   @override
   void initState() {
@@ -31,12 +37,26 @@ class _HomePageState extends State<HomePage> {
     if (user != null) {
       _dashboardBloc.add(FetchDashboard(user.type));
     }
+    // Fetch notifications to get unread count
+    final notificationBloc = di.sl<NotificationBloc>()..add(const FetchNotifications());
+    notificationBloc.stream.listen((state) {
+      if (state is NotificationLoaded) {
+        setState(() {
+          _unreadCount = state.data.result.unreadCount;
+        });
+      }
+    });
   }
-
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: _dashboardBloc,
+    // Get NotificationBloc instance and fetch initial notifications
+    final notificationBloc = di.sl<NotificationBloc>()..add(const FetchNotifications());
+
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: _dashboardBloc),
+        BlocProvider.value(value: notificationBloc),
+      ],
       child: Scaffold(
         drawer: _buildDrawer(context),
         backgroundColor: const Color(0xFFF8F9FC),
@@ -53,10 +73,57 @@ class _HomePageState extends State<HomePage> {
           ),
           centerTitle: false,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined,
-                  color: Color(0xFF0A8FDC)),
-              onPressed: () {},
+            BlocBuilder<NotificationBloc, NotificationState>(
+              builder: (context, state) {
+                int unread = 0;
+                if (state is NotificationLoaded) {
+                  unread = state.data.result.unreadCount;
+                }
+                return Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.notifications_outlined, color: Color(0xFF0A8FDC)),
+                      onPressed: () async {
+                        // Navigate to NotificationPage
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const NotificationPage()),
+                        );
+                        // Refresh notifications to update unread count
+                        if (result == true) {
+                          context.read<NotificationBloc>().add(const FetchNotifications());
+                        }
+                      },
+                    ),
+                    if (unread > 0)
+                      Positioned(
+                        right: 6,
+                        top: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          child: Center(
+                            child: Text(
+                              unread > 99 ? '99+' : unread.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -502,6 +569,13 @@ class _HomePageState extends State<HomePage> {
                 }),
                 _drawerItem(Icons.settings_outlined, "Settings", () {
                   Navigator.pop(context);
+                }),
+                _drawerItem(Icons.calendar_today, "Appointments", () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AppointmentsScreen()),
+                  );
                 }),
                 const Divider(),
                 _drawerItem(Icons.logout, "Logout", () async {

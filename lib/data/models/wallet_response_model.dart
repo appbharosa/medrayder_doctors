@@ -1,31 +1,57 @@
-import 'package:json_annotation/json_annotation.dart';
-
-part 'wallet_response_model.g.dart';
-
-@JsonSerializable()
 class WalletResponseModel {
   final int status;
   final String message;
   final WalletResult result;
 
-  WalletResponseModel({required this.status, required this.message, required this.result});
+  WalletResponseModel({
+    required this.status,
+    required this.message,
+    required this.result,
+  });
 
-  factory WalletResponseModel.fromJson(Map<String, dynamic> json) =>
-      _$WalletResponseModelFromJson(json);
-  Map<String, dynamic> toJson() => _$WalletResponseModelToJson(this);
+  factory WalletResponseModel.fromJson(Map<String, dynamic> json) {
+    return WalletResponseModel(
+      status: _toInt(json['status']),
+      message: _toString(json['message']),
+      result: WalletResult.fromJson(json['result'] ?? {}),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'status': status,
+    'message': message,
+    'result': result.toJson(),
+  };
+
+  // Utility methods for safe type conversion
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static String _toString(dynamic value) {
+    if (value == null) return '';
+    return value.toString();
+  }
 }
 
-@JsonSerializable()
 class WalletResult {
-  @JsonKey(name: 'user_info')
-  final WalletUserInfoModel userInfo;
-  @JsonKey(name: 'account_summary')
-  final WalletAccountSummaryModel accountSummary;
-  final List<WalletTransactionModel> transactions;
-  final WalletPaginationModel pagination;
-  @JsonKey(name: 'statement_period')
+  final WalletUserInfo userInfo;
+  final WalletAccountSummary accountSummary;
+  final List<WalletTransaction> transactions;
+  final WalletPagination pagination;
   final WalletStatementPeriod statementPeriod;
-  @JsonKey(name: 'filters_applied')
   final WalletFiltersApplied filtersApplied;
 
   WalletResult({
@@ -37,33 +63,62 @@ class WalletResult {
     required this.filtersApplied,
   });
 
-  factory WalletResult.fromJson(Map<String, dynamic> json) =>
-      _$WalletResultFromJson(json);
-  Map<String, dynamic> toJson() => _$WalletResultToJson(this);
+  factory WalletResult.fromJson(Map<String, dynamic> json) {
+    dynamic filtersData = json['filters_applied'];
+    WalletFiltersApplied filters;
+    if (filtersData is Map<String, dynamic>) {
+      filters = WalletFiltersApplied.fromJson(filtersData);
+    } else {
+      filters = WalletFiltersApplied(transactionType: 'all'); // fallback
+    }
+
+    return WalletResult(
+      userInfo: WalletUserInfo.fromJson(json['user_info'] ?? {}),
+      accountSummary: WalletAccountSummary.fromJson(json['account_summary'] ?? {}),
+      transactions: _parseTransactions(json['transactions']),
+      pagination: WalletPagination.fromJson(json['pagination'] ?? {}),
+      statementPeriod: WalletStatementPeriod.fromJson(json['statement_period'] ?? {}),
+      filtersApplied: filters,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'user_info': userInfo.toJson(),
+    'account_summary': accountSummary.toJson(),
+    'transactions': transactions.map((e) => e.toJson()).toList(),
+    'pagination': pagination.toJson(),
+    'statement_period': statementPeriod.toJson(),
+    'filters_applied': filtersApplied.toJson(),
+  };
+
+  static List<WalletTransaction> _parseTransactions(dynamic data) {
+    if (data == null) return [];
+    if (data is List) {
+      return data
+          .where((item) => item is Map<String, dynamic>)
+          .map((item) => WalletTransaction.fromJson(item))
+          .toList();
+    }
+    return [];
+  }
 }
 
-@JsonSerializable()
-class WalletUserInfoModel {
+class WalletUserInfo {
   final String name;
-  final String mobile;  // ✅ Always String
-  @JsonKey(name: 'account_opened')
+  final String mobile;
   final String accountOpened;
 
-  WalletUserInfoModel({
+  WalletUserInfo({
     required this.name,
     required this.mobile,
     required this.accountOpened,
   });
 
-  factory WalletUserInfoModel.fromJson(Map<String, dynamic> json) {
-    // Safe conversion for mobile (int or string)
-    final mobileValue = json['mobile'];
-    final mobileStr = mobileValue?.toString() ?? '';
-
-    return WalletUserInfoModel(
-      name: json['name']?.toString() ?? '',
-      mobile: mobileStr,
-      accountOpened: json['account_opened']?.toString() ?? '',
+  factory WalletUserInfo.fromJson(Map<String, dynamic> json) {
+    return WalletUserInfo(
+      name: _toString(json['name']),
+      mobile: _toString(json['mobile']),
+      accountOpened: _toString(json['account_opened']),
     );
   }
 
@@ -72,26 +127,20 @@ class WalletUserInfoModel {
     'mobile': mobile,
     'account_opened': accountOpened,
   };
+
+  static String _toString(dynamic value) => value?.toString() ?? '';
 }
 
-@JsonSerializable()
-class WalletAccountSummaryModel {
-  @JsonKey(name: 'current_balance')
+class WalletAccountSummary {
   final double currentBalance;
-  @JsonKey(name: 'total_credit')
   final double totalCredit;
-  @JsonKey(name: 'total_debit')
   final double totalDebit;
-  @JsonKey(name: 'net_balance')
   final double netBalance;
-  @JsonKey(name: 'total_transactions')
   final int totalTransactions;
-  @JsonKey(name: 'completed_transactions')
   final int completedTransactions;
-  @JsonKey(name: 'pending_transactions')
   final int pendingTransactions;
 
-  WalletAccountSummaryModel({
+  WalletAccountSummary({
     required this.currentBalance,
     required this.totalCredit,
     required this.totalDebit,
@@ -101,23 +150,8 @@ class WalletAccountSummaryModel {
     required this.pendingTransactions,
   });
 
-  factory WalletAccountSummaryModel.fromJson(Map<String, dynamic> json) {
-    // Safe conversion for all numbers (handle int/double)
-    double _toDouble(dynamic value) {
-      if (value == null) return 0.0;
-      if (value is double) return value;
-      if (value is int) return value.toDouble();
-      if (value is String) return double.tryParse(value) ?? 0.0;
-      return 0.0;
-    }
-    int _toInt(dynamic value) {
-      if (value == null) return 0;
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? 0;
-      return 0;
-    }
-
-    return WalletAccountSummaryModel(
+  factory WalletAccountSummary.fromJson(Map<String, dynamic> json) {
+    return WalletAccountSummary(
       currentBalance: _toDouble(json['current_balance']),
       totalCredit: _toDouble(json['total_credit']),
       totalDebit: _toDouble(json['total_debit']),
@@ -137,20 +171,34 @@ class WalletAccountSummaryModel {
     'completed_transactions': completedTransactions,
     'pending_transactions': pendingTransactions,
   };
+
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
 }
 
-@JsonSerializable()
-class WalletTransactionModel {
+class WalletTransaction {
   final int id;
   final String? reference;
   final double amount;
   final String type;
   final String status;
   final String? description;
-  @JsonKey(name: 'created_at')
   final String? createdAt;
 
-  WalletTransactionModel({
+  WalletTransaction({
     required this.id,
     this.reference,
     required this.amount,
@@ -160,30 +208,15 @@ class WalletTransactionModel {
     this.createdAt,
   });
 
-  factory WalletTransactionModel.fromJson(Map<String, dynamic> json) {
-    // Safe amount parsing
-    double _toDouble(dynamic value) {
-      if (value == null) return 0.0;
-      if (value is double) return value;
-      if (value is int) return value.toDouble();
-      if (value is String) return double.tryParse(value) ?? 0.0;
-      return 0.0;
-    }
-    int _toInt(dynamic value) {
-      if (value == null) return 0;
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? 0;
-      return 0;
-    }
-
-    return WalletTransactionModel(
+  factory WalletTransaction.fromJson(Map<String, dynamic> json) {
+    return WalletTransaction(
       id: _toInt(json['id']),
-      reference: json['reference']?.toString(),
+      reference: _toStringOrNull(json['reference']),
       amount: _toDouble(json['amount']),
-      type: json['type']?.toString() ?? '',
-      status: json['status']?.toString() ?? '',
-      description: json['description']?.toString(),
-      createdAt: json['created_at']?.toString(),
+      type: _toString(json['type']),
+      status: _toString(json['status']),
+      description: _toStringOrNull(json['description']),
+      createdAt: _toStringOrNull(json['created_at']),
     );
   }
 
@@ -196,21 +229,36 @@ class WalletTransactionModel {
     'description': description,
     'created_at': createdAt,
   };
+
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static String _toString(dynamic value) => value?.toString() ?? '';
+  static String? _toStringOrNull(dynamic value) => value?.toString();
 }
 
-@JsonSerializable()
-class WalletPaginationModel {
-  @JsonKey(name: 'current_page')
+class WalletPagination {
   final int currentPage;
-  @JsonKey(name: 'last_page')
   final int lastPage;
-  @JsonKey(name: 'per_page')
   final int perPage;
   final int total;
   final int? from;
   final int? to;
 
-  WalletPaginationModel({
+  WalletPagination({
     required this.currentPage,
     required this.lastPage,
     required this.perPage,
@@ -219,14 +267,8 @@ class WalletPaginationModel {
     this.to,
   });
 
-  factory WalletPaginationModel.fromJson(Map<String, dynamic> json) {
-    int _toInt(dynamic value) {
-      if (value == null) return 0;
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? 0;
-      return 0;
-    }
-    return WalletPaginationModel(
+  factory WalletPagination.fromJson(Map<String, dynamic> json) {
+    return WalletPagination(
       currentPage: _toInt(json['current_page']),
       lastPage: _toInt(json['last_page']),
       perPage: _toInt(json['per_page']),
@@ -244,21 +286,26 @@ class WalletPaginationModel {
     'from': from,
     'to': to,
   };
+
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
 }
 
-@JsonSerializable()
 class WalletStatementPeriod {
-  @JsonKey(name: 'start_date')
   final String startDate;
-  @JsonKey(name: 'end_date')
   final String endDate;
 
   WalletStatementPeriod({required this.startDate, required this.endDate});
 
   factory WalletStatementPeriod.fromJson(Map<String, dynamic> json) {
     return WalletStatementPeriod(
-      startDate: json['start_date']?.toString() ?? '',
-      endDate: json['end_date']?.toString() ?? '',
+      startDate: _toString(json['start_date']),
+      endDate: _toString(json['end_date']),
     );
   }
 
@@ -266,22 +313,24 @@ class WalletStatementPeriod {
     'start_date': startDate,
     'end_date': endDate,
   };
+
+  static String _toString(dynamic value) => value?.toString() ?? '';
 }
 
-@JsonSerializable()
 class WalletFiltersApplied {
-  @JsonKey(name: 'transaction_type')
   final String transactionType;
 
   WalletFiltersApplied({required this.transactionType});
 
   factory WalletFiltersApplied.fromJson(Map<String, dynamic> json) {
     return WalletFiltersApplied(
-      transactionType: json['transaction_type']?.toString() ?? '',
+      transactionType: _toString(json['transaction_type']),
     );
   }
 
   Map<String, dynamic> toJson() => {
     'transaction_type': transactionType,
   };
+
+  static String _toString(dynamic value) => value?.toString() ?? '';
 }

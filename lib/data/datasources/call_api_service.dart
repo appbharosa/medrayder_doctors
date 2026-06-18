@@ -43,6 +43,23 @@ class CallApiService {
       throw _handleError(e);
     }
   }
+  Future<Map<String, dynamic>> endCall(String roomId, String callId) async {
+    try {
+      final response = await dio.delete(
+        '${AppUrls.endCall}/$roomId',
+        data: {'room_id': roomId, 'call_id': callId},
+      );
+      // Even if status is 404, we can still treat as success if we want? But we'll treat non-200 as error.
+      if (response.statusCode == 200 || response.statusCode == 404) {
+        // For 404, we might still want to close the call, so return success.
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw Exception('Failed to end call: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
 
   String _handleError(DioException error) {
     if (error.response != null) {

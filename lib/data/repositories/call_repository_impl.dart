@@ -19,4 +19,8 @@ class CallRepositoryImpl implements CallRepository {
   Future<JoinRoomResponseModel> joinRoom(JoinRoomRequestModel request) {
     return apiService.joinRoom(request);
   }
+  @override
+  Future<Map<String, dynamic>> endCall(String roomId, String callId) {
+    return apiService.endCall(roomId, callId);
+  }
 }

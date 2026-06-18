@@ -37,3 +37,11 @@ class CallError extends CallState {
   @override
   List<Object?> get props => [error];
 }
+
+class CallEnding extends CallState {}   // loading state
+class CallEnded extends CallState {
+  final String message;
+  const CallEnded(this.message);
+  @override
+  List<Object?> get props => [message];
+}

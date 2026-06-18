@@ -9,6 +9,20 @@ class CallBloc extends Bloc<CallEvent, CallState> {
   CallBloc({required this.repository}) : super(CallInitial()) {
     on<StartVideoCall>(_onStartVideoCall);
     on<JoinVideoCall>(_onJoinVideoCall);
+    on<ResetCallState>(_onReset);
+    on<EndCall>((event, emit) async {
+      emit(CallEnding());
+      try {
+        final response = await repository.endCall(event.roomId, event.callId);
+        emit(CallEnded(response['message'] ?? 'Call ended successfully'));
+      } catch (e) {
+        emit(CallError(e.toString()));
+      }
+    });
+  }
+
+  void _onReset(ResetCallState event, Emitter<CallState> emit) {
+    emit(CallInitial());
   }
 
   Future<void> _onStartVideoCall(StartVideoCall event, Emitter<CallState> emit) async {

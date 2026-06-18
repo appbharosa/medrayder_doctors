@@ -15,6 +15,7 @@ class StartVideoCall extends CallEvent {
   @override
   List<Object?> get props => [request];
 }
+class ResetCallState extends CallEvent {}
 
 class JoinVideoCall extends CallEvent {
   final JoinRoomRequestModel request;
@@ -22,4 +23,11 @@ class JoinVideoCall extends CallEvent {
   const JoinVideoCall(this.request);
   @override
   List<Object?> get props => [request];
+}
+class EndCall extends CallEvent {
+  final String roomId;
+  final String callId;
+  const EndCall(this.roomId, this.callId);
+  @override
+  List<Object?> get props => [roomId, callId];
 }

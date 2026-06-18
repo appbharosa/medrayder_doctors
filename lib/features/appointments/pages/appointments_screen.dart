@@ -26,6 +26,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   late final AppointmentBloc _appointmentBloc;
   late final CallBloc _callBloc;
   final ScrollController _scrollController = ScrollController();
+  String? _currentCallId;
+  AppointmentModel? _currentAppointment;
+  bool _canStartCall = true;
 
   @override
   void initState() {
@@ -62,34 +65,37 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     }
   }
 
-  // Video Call Logic
   void _startVideoCall(BuildContext context, AppointmentModel appointment) {
+    if (!_canStartCall) {
+      _showSnackBar(context, 'Please wait a moment before starting another call');
+      return;
+    }
+
     final user = UserManager().currentUser;
     if (user == null) {
       _showSnackBar(context, 'User not logged in');
       return;
     }
 
-    // Show loading dialog
+    _currentAppointment = appointment;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
-    // Create room request
     final request = CreateRoomRequestModel(
       type: user.type,
       doctorId: user.id,
       patientId: appointment.userId,
       appointmentId: appointment.id,
-      duration: 30, // Default 30 minutes
+      duration: 30,
     );
 
     _callBloc.add(StartVideoCall(request));
   }
 
-  // Helper: Show snackbar
   void _showSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -101,7 +107,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     );
   }
 
-  // Cancel confirmation dialog
   void _showCancelConfirmation(BuildContext context, AppointmentModel appointment) {
     showDialog(
       context: context,
@@ -117,7 +122,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
             onPressed: () {
               Navigator.pop(context);
               _showSnackBar(context, 'Cancelled ${appointment.bookingId}');
-              // TODO: Implement cancellation API call
             },
             child: const Text('Yes, Cancel', style: TextStyle(color: Colors.red)),
           ),
@@ -127,7 +131,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
@@ -136,61 +139,59 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       ],
       child: BlocListener<CallBloc, CallState>(
         listener: (context, state) {
-          // Close loading dialog if open
-          // We'll use a flag to manage loading state
-          // For simplicity, we'll use a global loading overlay with a key.
           if (state is CallRoomCreated) {
-            // Room created – now join
-            final roomData = state.data;
+            _currentCallId = state.data.result.callId;
             final joinRequest = JoinRoomRequestModel(
-              roomId: roomData.result.roomId,
-              callId: roomData.result.callId,
+              roomId: state.data.result.roomId,
+              callId: state.data.result.callId,
             );
             context.read<CallBloc>().add(JoinVideoCall(joinRequest));
           } else if (state is CallRoomJoined) {
-            // Room joined – navigate to video call
-            // Close loading dialog
-            Navigator.pop(context);
+            Navigator.pop(context); // dismiss loading
+
+            final appointment = _currentAppointment;
+            if (appointment == null) {
+              _showSnackBar(context, 'Appointment not found');
+              return;
+            }
+
+            _canStartCall = false;
+
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => VideoCallScreen(
+                  key: ValueKey('video_${DateTime.now().millisecondsSinceEpoch}_${appointment.id}'),
                   token: state.data.result.token,
                   roomId: state.data.result.roomId,
-                  appointment: AppointmentModel(
-                    id: 0,
-                    bookingId: '',
-                    consultType: '',
-                    userId: 0,
-                    specialityId: 0,
-                    doctorId: 0,
-                    slotId: 0,
-                    time: '',
-                    date: '',
-                    mobile: '',
-                    callStatus: 0,
-                    familyMemberId: 0,
-                    fee: 0,
-                    consultationFee: 0,
-                    couponId: 0,
-                    couponPercentage: 0,
-                    couponDiscount: 0,
-                    specialityName: '',
-                    doctorName: '',
-                    patientImage: '',
-                    patientName: 'Patient',
-                    patientEmail: '',
-                    patientGender: '',
-                    patientDob: '',
-                    bloodGroup: '',
-                    qualification: '',
-                  ),
+                  callId: _currentCallId ?? '',
+                  callBloc: _callBloc,
+                  appointment: appointment,
                 ),
               ),
-            );
+            ).then((_) {
+              // Reset bloc and clear stored data
+              _callBloc.add(ResetCallState());
+              _currentAppointment = null;
+              _currentCallId = null;
+
+              // ✅ Force a small delay and then enable new calls
+              // This gives the SDK time to release native resources
+              Future.delayed(const Duration(milliseconds: 800), () {
+                _canStartCall = true;
+              });
+
+              // Refresh the appointment list
+              final user = UserManager().currentUser;
+              if (user != null) {
+                _appointmentBloc.add(FetchAppointments(type: user.type));
+              }
+            });
           } else if (state is CallError) {
             Navigator.pop(context);
             _showSnackBar(context, state.error);
+            _callBloc.add(ResetCallState());
+            _canStartCall = true;
           }
         },
         child: Scaffold(
@@ -248,7 +249,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       ),
     );
   }
-
   Widget _buildAppointmentsList(BuildContext context, AppointmentLoaded state, {bool isLoadingMore = false}) {
     if (state.appointments.isEmpty) {
       return const Center(
@@ -451,7 +451,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               child: OutlinedButton(
                 onPressed: () {
                   _showSnackBar(context, 'Opening details for ${appointment.bookingId}');
-                  // TODO: Navigate to appointment details
                 },
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xff1565C0)),

@@ -50,6 +50,8 @@ dependencies:
   wakelock_plus: ^1.2.8
   enx_uikit_flutter: ^2.0.4
   json_annotation: ^4.8.1
+  get: ^4.6.6
+
 
 
 

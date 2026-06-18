@@ -6,4 +6,5 @@ import '../../data/models/join_room_response_model.dart';
 abstract class CallRepository {
   Future<CreateRoomResponseModel> createRoom(CreateRoomRequestModel request);
   Future<JoinRoomResponseModel> joinRoom(JoinRoomRequestModel request);
+  Future<Map<String, dynamic>> endCall(String roomId, String callId);
 }

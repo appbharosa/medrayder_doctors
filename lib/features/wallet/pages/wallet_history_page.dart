@@ -240,113 +240,500 @@ class _WalletHistoryPageState extends State<WalletHistoryPage> {
     final summary = result.accountSummary;
     final transactions = result.transactions;
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // User Info
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${result.userInfo.name}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return RefreshIndicator(
+      color: const Color(0xff1565C0),
+      onRefresh: () async {
+        _fetchHistory();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+
+            /// TOP USER CARD
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xff1565C0),
+                    Color(0xff42A5F5),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(height: 4),
-                Text('Mobile: ${result.userInfo.mobile}', style: const TextStyle(fontSize: 14)),
-                Text('Account Opened: ${result.userInfo.accountOpened}', style: const TextStyle(fontSize: 14)),
-              ],
-            ),
-          ),
-          // Summary Cards
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _summaryCard(Icons.account_balance_wallet, 'Balance', '₹${summary.currentBalance}', Colors.blue),
-                _summaryCard(Icons.add, 'Credit', '₹${summary.totalCredit}', Colors.green),
-                _summaryCard(Icons.remove, 'Debit', '₹${summary.totalDebit}', Colors.red),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _summaryCard(Icons.receipt, 'Total Transactions', '${summary.totalTransactions}', Colors.orange),
-          ),
-          const SizedBox(height: 16),
-          // Transactions List
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              'Transactions',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 8),
-          transactions.isEmpty
-              ? const Center(child: Text('No transactions found'))
-              : ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: transactions.length,
-            itemBuilder: (context, index) {
-              final txn = transactions[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    txn.type == 'credit' ? Icons.add : Icons.remove,
-                    color: txn.type == 'credit' ? Colors.green : Colors.red,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.18),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
                   ),
-                  title: Text(
-                    txn.type.toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(txn.description ?? ''),
-                  trailing: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                ],
+              ),
+              child: Column(
+                children: [
+
+                  Row(
                     children: [
-                      Text(
-                        '₹${txn.amount}',
-                        style: TextStyle(
-                          color: txn.type == 'credit' ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+
+                      /// PROFILE ICON
+                      Container(
+                        width: 62,
+                        height: 62,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 34,
                         ),
                       ),
-                      Text(
-                        txn.status,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+
+                      const SizedBox(width: 14),
+
+                      /// USER DETAILS
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+
+                            Text(
+                              result.userInfo.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+
+                            const SizedBox(height: 5),
+
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.phone,
+                                  color: Colors.white,
+                                  size: 15,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  result.userInfo.mobile,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 5),
+
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.calendar_month,
+                                  color: Colors.white,
+                                  size: 15,
+                                ),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(
+                                    'Opened : ${result.userInfo.accountOpened}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
-          // Pagination
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Center(
-              child: Text(
-                'Page ${result.pagination.currentPage} of ${result.pagination.lastPage}',
-                style: const TextStyle(color: Colors.grey, fontSize: 14),
+
+                  const SizedBox(height: 22),
+
+                  /// CURRENT BALANCE
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 18,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+
+                        const Text(
+                          "Current Balance",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+
+                        const SizedBox(height: 6),
+
+                        Text(
+                          '₹${summary.currentBalance}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+            /// SUMMARY TITLE
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                "Wallet Summary",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xff222222),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            /// SUMMARY CARDS
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+
+                  Expanded(
+                    child: _modernSummaryCard(
+                      title: "Credit",
+                      value: '₹${summary.totalCredit}',
+                      icon: Icons.arrow_downward_rounded,
+                      color: Colors.green,
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: _modernSummaryCard(
+                      title: "Debit",
+                      value: '₹${summary.totalDebit}',
+                      icon: Icons.arrow_upward_rounded,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _modernSummaryCard(
+                title: "Transactions",
+                value: '${summary.totalTransactions}',
+                icon: Icons.receipt_long_rounded,
+                color: Colors.orange,
+                fullWidth: true,
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            /// TRANSACTION TITLE
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                "Recent Transactions",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xff222222),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            /// TRANSACTIONS
+            transactions.isEmpty
+                ? Padding(
+              padding: const EdgeInsets.only(top: 60),
+              child: Center(
+                child: Column(
+                  children: [
+
+                    Icon(
+                      Icons.account_balance_wallet_outlined,
+                      size: 70,
+                      color: Colors.grey.shade400,
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Text(
+                      'No Transactions Found',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+                : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: transactions.length,
+              itemBuilder: (context, index) {
+
+                final txn = transactions[index];
+                final bool isCredit = txn.type == 'credit';
+
+                return Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 7,
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+
+                      /// ICON
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: isCredit
+                              ? Colors.green.withOpacity(0.12)
+                              : Colors.red.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          isCredit
+                              ? Icons.arrow_downward_rounded
+                              : Icons.arrow_upward_rounded,
+                          color: isCredit
+                              ? Colors.green
+                              : Colors.red,
+                          size: 28,
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      /// DETAILS
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+
+                            Text(
+                              txn.type.toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xff222222),
+                              ),
+                            ),
+
+                            const SizedBox(height: 5),
+
+                            Text(
+                              txn.description ?? 'Wallet Transaction',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                                height: 1.3,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: txn.status.toLowerCase() == 'success'
+                                    ? Colors.green.shade50
+                                    : Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                txn.status,
+                                style: TextStyle(
+                                  color:
+                                  txn.status.toLowerCase() == 'success'
+                                      ? Colors.green.shade700
+                                      : Colors.orange.shade700,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      /// AMOUNT
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+
+                          Text(
+                            '${isCredit ? '+' : '-'} ₹${txn.amount}',
+                            style: TextStyle(
+                              color: isCredit
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          Text(
+                            txn.createdAt ?? '',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            /// PAGINATION
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Text(
+                  'Page ${result.pagination.currentPage} of ${result.pagination.lastPage}',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _modernSummaryCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    bool fullWidth = false,
+  }) {
+    return Container(
+      width: fullWidth ? double.infinity : null,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-
   Widget _summaryCard(IconData icon, String label, String value, Color color) {
     return Expanded(
       child: Card(

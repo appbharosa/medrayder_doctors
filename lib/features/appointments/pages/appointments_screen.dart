@@ -45,6 +45,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _appointmentBloc.close();
+    _callBloc.close();
     super.dispose();
   }
 
@@ -70,26 +72,24 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       _showSnackBar(context, 'Please wait a moment before starting another call');
       return;
     }
-
     final user = UserManager().currentUser;
     if (user == null) {
       _showSnackBar(context, 'User not logged in');
       return;
     }
+    // ✅ Ensure the appointment IDs are valid numbers (they are now ints)
+    if (appointment.userId == 0 || appointment.id == 0) {
+      _showSnackBar(context, 'Invalid appointment data');
+      return;
+    }
 
     _currentAppointment = appointment;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
 
     final request = CreateRoomRequestModel(
       type: user.type,
       doctorId: user.id,
-      patientId: appointment.userId,
-      appointmentId: appointment.id,
+      patientId: appointment.userId,   // now safely an int
+      appointmentId: appointment.id,   // now safely an int
       duration: 30,
     );
 
@@ -140,48 +140,41 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       child: BlocListener<CallBloc, CallState>(
         listener: (context, state) {
           if (state is CallRoomCreated) {
-            _currentCallId = state.data.result.callId;
-            final joinRequest = JoinRoomRequestModel(
-              roomId: state.data.result.roomId,
-              callId: state.data.result.callId,
-            );
-            context.read<CallBloc>().add(JoinVideoCall(joinRequest));
-          } else if (state is CallRoomJoined) {
-            Navigator.pop(context); // dismiss loading
+            // Dismiss loading dialog (shown in _startVideoCall)
+            Navigator.pop(context);
+
+            final result = state.data; // CreateRoomResult
+            _currentCallId = result.callId;
 
             final appointment = _currentAppointment;
             if (appointment == null) {
               _showSnackBar(context, 'Appointment not found');
+              _canStartCall = true;
               return;
             }
 
-            _canStartCall = false;
-
+            // ✅ Navigate directly using the doctor token from create-room
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => VideoCallScreen(
                   key: ValueKey('video_${DateTime.now().millisecondsSinceEpoch}_${appointment.id}'),
-                  token: state.data.result.token,
-                  roomId: state.data.result.roomId,
-                  callId: _currentCallId ?? '',
+                  token: result.doctorToken,   // 👈 doctor token
+                  roomId: result.roomId,
+                  callId: result.callId,
                   callBloc: _callBloc,
                   appointment: appointment,
                 ),
               ),
             ).then((_) {
-              // Reset bloc and clear stored data
               _callBloc.add(ResetCallState());
               _currentAppointment = null;
               _currentCallId = null;
 
-              // ✅ Force a small delay and then enable new calls
-              // This gives the SDK time to release native resources
-              Future.delayed(const Duration(milliseconds: 800), () {
-                _canStartCall = true;
+              Future.delayed(const Duration(seconds: 1), () {
+                if (mounted) _canStartCall = true;
               });
 
-              // Refresh the appointment list
               final user = UserManager().currentUser;
               if (user != null) {
                 _appointmentBloc.add(FetchAppointments(type: user.type));
@@ -196,7 +189,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         },
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Active Appointments'),
+            title: const Text('Active Appointments',  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),),
             backgroundColor: const Color(0xff1565C0),
             foregroundColor: Colors.white,
           ),
@@ -249,7 +242,12 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       ),
     );
   }
-  Widget _buildAppointmentsList(BuildContext context, AppointmentLoaded state, {bool isLoadingMore = false}) {
+
+  Widget _buildAppointmentsList(
+      BuildContext context,
+      AppointmentLoaded state, {
+        bool isLoadingMore = false,
+      }) {
     if (state.appointments.isEmpty) {
       return const Center(
         child: Column(
@@ -257,7 +255,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           children: [
             Icon(Icons.event_busy, size: 60, color: Colors.grey),
             SizedBox(height: 16),
-            Text('No active appointments found', style: TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(
+              'No active appointments found',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
           ],
         ),
       );
@@ -288,201 +289,443 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     );
   }
 
-  Widget _buildAppointmentCard(BuildContext context, AppointmentModel appointment) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top row: Booking ID & Status badge
-            Row(
+  Widget _buildAppointmentCard(
+      BuildContext context,
+      AppointmentModel appointment,
+      ) {
+    final bool isOnline = appointment.consultType.toLowerCase() == 'online';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+
+          /// TOP HEADER
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: const BoxDecoration(
+              color: Color(0xff1565C0),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(22),
+                topRight: Radius.circular(22),
+              ),
+            ),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  appointment.bookingId,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xff1565C0),
-                  ),
+
+                /// BOOKING ID
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Booking ID",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      appointment.bookingId,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
                 ),
+
+                /// ONLINE / OFFLINE
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
-                    color: appointment.consultType == 'online'
-                        ? Colors.blue.shade100
-                        : Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(20),
+                    color: isOnline
+                        ? Colors.lightBlue.shade50
+                        : Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(30),
                   ),
-                  child: Text(
-                    appointment.consultType.toUpperCase(),
-                    style: TextStyle(
-                      color: appointment.consultType == 'online'
-                          ? Colors.blue.shade800
-                          : Colors.green.shade800,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Patient info row
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(30),
-                  child: CachedNetworkImage(
-                    imageUrl: appointment.patientImage.isNotEmpty
-                        ? appointment.patientImage
-                        : 'https://via.placeholder.com/60',
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => const Icon(
-                      Icons.person,
-                      size: 40,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
+                      Icon(
+                        isOnline
+                            ? Icons.video_call_rounded
+                            : Icons.local_hospital_rounded,
+                        size: 15,
+                        color: isOnline
+                            ? Colors.blue.shade800
+                            : Colors.green.shade700,
+                      ),
+                      const SizedBox(width: 5),
                       Text(
-                        appointment.patientName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        appointment.consultType.toUpperCase(),
+                        style: TextStyle(
+                          color: isOnline
+                              ? Colors.blue.shade800
+                              : Colors.green.shade700,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${appointment.patientGender} · ${appointment.patientDob}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                      Text(
-                        appointment.bloodGroup.isNotEmpty
-                            ? 'Blood Group: ${appointment.bloodGroup}'
-                            : '',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const Divider(height: 24),
-            // Details chips
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
               children: [
-                _infoChip(Icons.calendar_today, appointment.date),
-                _infoChip(Icons.access_time, appointment.time),
-                _infoChip(Icons.medical_services, appointment.specialityName),
-                _infoChip(Icons.person, appointment.doctorName),
-                _infoChip(Icons.attach_money, '₹${appointment.fee}'),
-                if (appointment.couponDiscount > 0)
-                  _infoChip(Icons.local_offer, '₹${appointment.couponDiscount} off'),
-              ],
-            ),
-            if (appointment.qualification.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Qualification: ${appointment.qualification}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-            const SizedBox(height: 12),
-            // Action buttons row: Video Call & Cancel Consultation
-            Row(
-              children: [
-                // Video Call button (green)
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _startVideoCall(context, appointment),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+
+                /// PATIENT INFO
+                Row(
+                  children: [
+
+                    /// IMAGE
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.grey.shade200,
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: CachedNetworkImage(
+                          imageUrl: appointment.patientImage.isNotEmpty
+                              ? appointment.patientImage
+                              : 'https://via.placeholder.com/150',
+                          width: 70,
+                          height: 70,
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) {
+                            return Container(
+                              width: 70,
+                              height: 70,
+                              color: Colors.grey.shade100,
+                              child: const Icon(
+                                Icons.person,
+                                size: 35,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                    icon: const Icon(Icons.video_call, color: Colors.white, size: 18),
-                    label: const Text(
-                      'Video Call',
-                      style: TextStyle(color: Colors.white, fontSize: 13),
+
+                    const SizedBox(width: 14),
+
+                    /// DETAILS
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+
+                          Text(
+                            appointment.patientName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xff222222),
+                            ),
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 15,
+                                color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  '${appointment.patientGender} • ${appointment.patientDob}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          if (appointment.bloodGroup.isNotEmpty) ...[
+                            const SizedBox(height: 5),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.bloodtype,
+                                  size: 15,
+                                  color: Colors.red,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Blood Group : ${appointment.bloodGroup}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 18),
+
+                /// INFO CONTAINERS
+                Row(
+                  children: [
+
+                    Expanded(
+                      child: _modernInfoCard(
+                        icon: Icons.calendar_month_rounded,
+                        title: "Date",
+                        value: appointment.date,
+                        iconColor: Colors.blue,
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: _modernInfoCard(
+                        icon: Icons.access_time_filled_rounded,
+                        title: "Time",
+                        value: appointment.time,
+                        iconColor: Colors.orange,
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: _modernInfoCard(
+                        icon: Icons.currency_rupee_rounded,
+                        title: "Fee",
+                        value: appointment.fee.toString(),
+                        iconColor: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+
+                if (appointment.qualification.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+
+                        const Icon(
+                          Icons.workspace_premium_rounded,
+                          color: Color(0xff1565C0),
+                          size: 20,
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        Expanded(
+                          child: Text(
+                            appointment.qualification,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xff1565C0),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 20),
+
+                /// BUTTONS
+                Row(
+                  children: [
+
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            _startVideoCall(context, appointment),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.video_call_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        label: const Text(
+                          "Video Call",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () =>
+                            _showCancelConfirmation(context, appointment),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade500,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.cancel_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                /// VIEW DETAILS BUTTON
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      _showSnackBar(
+                        context,
+                        'Opening details for ${appointment.bookingId}',
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(
+                        color: Color(0xff1565C0),
+                        width: 1.3,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      "View Details",
+                      style: TextStyle(
+                        color: Color(0xff1565C0),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Cancel Consultation button (red)
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showCancelConfirmation(context, appointment),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    icon: const Icon(Icons.cancel, color: Colors.white, size: 18),
-                    label: const Text(
-                      'Cancel',
-                      style: TextStyle(color: Colors.white, fontSize: 13),
-                    ),
-                  ),
-                ),
               ],
             ),
-            const SizedBox(height: 8),
-            // "View Details" button (full width)
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  _showSnackBar(context, 'Opening details for ${appointment.bookingId}');
-                },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xff1565C0)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                ),
-                child: const Text(
-                  'View Details',
-                  style: TextStyle(color: Color(0xff1565C0)),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _infoChip(IconData icon, String label) {
+  Widget _modernInfoCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color iconColor,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.shade200,
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
         children: [
-          Icon(icon, size: 14, color: Colors.grey.shade700),
-          const SizedBox(width: 4),
+
+          Icon(
+            icon,
+            color: iconColor,
+            size: 22,
+          ),
+
+          const SizedBox(height: 8),
+
           Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xff222222),
+            ),
           ),
         ],
       ),

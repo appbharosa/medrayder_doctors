@@ -17,5 +17,6 @@ class AppUrls {
   static const String createRoom="doctor/create-room";
   static const String joinRoom="doctor/join-room";
   static const String endCall = "doctor/end-room";
+  static const String fcmToken="doctor/register-token";
   static const String getRoomDetails="doctor/room-details/6a2ba66a2405f1ebbcf6c639";
 }

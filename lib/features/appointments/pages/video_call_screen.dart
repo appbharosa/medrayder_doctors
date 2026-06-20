@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:enx_uikit_flutter/enx_uikit_flutter.dart';
+import '../../../core/app_urls/app_urls.dart';
+import '../../../core/di/injection.dart' as di;
+import '../../../core/network/dio_client.dart';
 import '../../../data/models/appointment_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../call_bloc/call_bloc.dart';
@@ -51,11 +54,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       embedUrl: '',
       disconnect: (map) {
         print('🔴 Disconnected: $map');
-        _handleCallEnd('Call ended');
+        _handleCallEnd('Call ended by remote');
       },
       connectError: (map) {
         print('❌ Connection error: $map');
-        _handleCallEnd('Connection error');
+        _handleCallEnd('Connection error: ${map['msg']}');
       },
       onPageSlide: (eventName, isShow) {
         print('📄 Page slide: $eventName, isShow: $isShow');
@@ -80,13 +83,51 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void _performEndCall([String? reason]) {
     if (_isEndingCall) return;
     setState(() => _isEndingCall = true);
-    widget.callBloc.add(EndCall(widget.roomId, widget.callId));
+
+    // Attempt to use the BLoC, but catch if it's closed
+    bool apiCalled = false;
+    try {
+      widget.callBloc.add(EndCall(widget.roomId, widget.callId));
+      apiCalled = true;
+      print('✅ EndCall event added to BLoC');
+    } catch (e) {
+      print('❌ BLoC is closed, falling back to direct API call: $e');
+      // Fallback: call the API directly
+      _callEndApiDirectly();
+    }
+
+    // Fallback: if the BLoC doesn't respond within 5 seconds, force close
+    Future.delayed(const Duration(seconds: 5), () {
+      if (_isCallActive && !_isDisposed) {
+        _callFullyEnded('Call ended (timeout)');
+      }
+    });
+  }
+
+  // Direct API call as fallback
+  Future<void> _callEndApiDirectly() async {
+    print('🔴 END CALL REQUEST (direct): roomId=${widget.roomId}, callId=${widget.callId}');
+    try {
+      final dio = di.sl<DioClient>().dio;
+      final response = await dio.delete(
+        '${AppUrls.endCall}/${widget.roomId}',
+        data: {'room_id': widget.roomId, 'call_id': widget.callId},
+      );
+      print('🔴 END CALL RESPONSE: ${response.statusCode}');
+      _callFullyEnded('Call ended successfully');
+    } catch (e) {
+      print('❌ Direct API call failed: $e');
+      _callFullyEnded('Call ended (fallback)');
+    }
   }
 
   void _callFullyEnded([String? reason]) {
     if (_isDisposed || !_isCallActive) return;
-    setState(() => _isCallActive = false);
-    if (reason != null && reason.isNotEmpty) {
+    setState(() {
+      _isCallActive = false;
+      _isEndingCall = false;
+    });
+    if (mounted && reason != null && reason.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(reason),
@@ -96,7 +137,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         ),
       );
     }
-    // ✅ Give the SDK time to release resources before popping
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) Navigator.pop(context);
     });
@@ -133,7 +173,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ? const SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
                 )
                     : const Icon(Icons.call_end, color: Colors.red),
                 onPressed: _isEndingCall ? null : () => _handleCallEnd('Call ended by user'),

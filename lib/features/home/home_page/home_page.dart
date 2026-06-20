@@ -63,15 +63,12 @@ class _HomePageState extends State<HomePage> {
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
-          title: const Text(
-            "MedRayder",
-            style: TextStyle(
-              color: Color(0xFF0A8FDC),
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+          title: SvgPicture.asset(
+            'assets/med.svg',  // Update path to your SVG
+            height: 32,                         // Adjust as needed
+            width: 100,                         // Adjust as needed
           ),
-          centerTitle: false,
+          centerTitle: true,
           actions: [
             BlocBuilder<NotificationBloc, NotificationState>(
               builder: (context, state) {
@@ -171,7 +168,7 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Welcome Card
+          // 1. Welcome Card (same as before, but ensure it matches the screenshot)
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(20),
@@ -208,7 +205,7 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "Welcome back!",
+                        "Good Morning", // or dynamic greeting based on time
                         style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       Text(
@@ -231,7 +228,7 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          userInfo.specialityId,
+                          userInfo.specialityId, // or speciality name
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -245,35 +242,50 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // Stats Row - Using static data from API (appointments_count)
+          // 2. Stats Row – Four cards
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding:  EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 _statCard(
                   context,
-                  "Appointments",
+                  "Today's Appointments",
                   data.result.appointmentsCount.toString(),
-                  "assets/icons/appointment.svg",
-                  Colors.blue,
+                  Icons.calendar_today,
+                  const Color(0xFF0A8FDC),
                 ),
                 const SizedBox(width: 12),
                 _statCard(
                   context,
-                  "Today's Date",
-                  data.result.todayDate,
-                  "assets/icons/calendar.svg",
-                  Colors.green,
+                  "Patients This Month",
+                  data.result.todayAppointments.toString(),
+                  Icons.people,
+                  const Color(0xFF4CAF50), // green
                 ),
-                // Add more cards if needed from API
+                const SizedBox(width: 12),
+                _statCard(
+                  context,
+                  "Earnings This Month",
+                  "₹${data.result.appointmentsCount.toStringAsFixed(0)}",
+                  Icons.currency_rupee,
+                  const Color(0xFFFF9800), // orange
+                ),
+                const SizedBox(width: 12),
+                _statCard(
+                  context,
+                  "Your Rating",
+                  data.result.appointmentsCount.toStringAsFixed(1) + " ★",
+                  Icons.star,
+                  const Color(0xFFFFC107), // yellow/gold
+                ),
               ],
             ),
           ),
 
           const SizedBox(height: 24),
 
-          // Quick Actions Section
+          // 3. Quick Actions Section
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -288,7 +300,9 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // Navigate to all actions
+                  },
                   child: const Text(
                     "View All",
                     style: TextStyle(color: Color(0xFF0A8FDC)),
@@ -302,12 +316,12 @@ class _HomePageState extends State<HomePage> {
 
           // Quick Actions Grid
           SizedBox(
-            height: 200,
+            height: 180, // adjust as needed
             child: GridView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 4,
-                childAspectRatio: 0.85,
+                childAspectRatio: 0.9,
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
               ),
@@ -319,7 +333,7 @@ class _HomePageState extends State<HomePage> {
                 return _quickActionCard(
                   context,
                   action.name,
-                  action.icon, // use icon string, you might map to asset
+                  action.icon, // map to IconData
                   action.route,
                 );
               },
@@ -328,7 +342,7 @@ class _HomePageState extends State<HomePage> {
 
           const SizedBox(height: 24),
 
-          // Today's Appointments Section
+          // 4. Today's Appointments Section
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -343,7 +357,9 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // Navigate to all appointments
+                  },
                   child: const Text(
                     "See All",
                     style: TextStyle(color: Color(0xFF0A8FDC)),
@@ -355,7 +371,7 @@ class _HomePageState extends State<HomePage> {
 
           const SizedBox(height: 12),
 
-          // Appointments List - if data exists, else show empty
+          // Appointments List
           todayAppointments.isEmpty
               ? const Padding(
             padding: EdgeInsets.all(16),
@@ -370,7 +386,6 @@ class _HomePageState extends State<HomePage> {
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16),
             itemBuilder: (context, index) {
-              // Adjust according to actual appointment model
               final appointment = todayAppointments[index];
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -401,7 +416,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   title: Text(
-                    appointment['patient_name'] ?? 'Patient',
+                    appointment.patientName ?? 'Patient',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -422,7 +437,7 @@ class _HomePageState extends State<HomePage> {
                                   size: 14, color: Colors.grey),
                               const SizedBox(width: 4),
                               Text(
-                                appointment['time'] ?? '--:--',
+                                appointment.time ?? '--:--',
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ],
@@ -434,7 +449,7 @@ class _HomePageState extends State<HomePage> {
                                   size: 14, color: Colors.grey),
                               const SizedBox(width: 4),
                               Text(
-                                appointment['type'] ?? 'Consultation',
+                                appointment.type ?? 'Consultation',
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ],
@@ -449,15 +464,15 @@ class _HomePageState extends State<HomePage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: appointment['status'] == 'Completed'
+                      color: appointment.status == 'Completed'
                           ? Colors.green.withOpacity(0.1)
                           : Colors.blue.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      appointment['status'] ?? 'Upcoming',
+                      appointment.status ?? 'Upcoming',
                       style: TextStyle(
-                        color: appointment['status'] == 'Completed'
+                        color: appointment.status == 'Completed'
                             ? Colors.green
                             : Colors.blue,
                         fontSize: 12,
@@ -712,7 +727,7 @@ class _HomePageState extends State<HomePage> {
       BuildContext context,
       String title,
       String value,
-      String iconPath,
+      IconData icon,
       Color color,
       ) {
     return SizedBox(
@@ -739,12 +754,7 @@ class _HomePageState extends State<HomePage> {
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: SvgPicture.asset(
-                iconPath,
-                width: 20,
-                height: 20,
-                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-              ),
+              child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(height: 12),
             Text(
@@ -775,15 +785,12 @@ class _HomePageState extends State<HomePage> {
   Widget _quickActionCard(
       BuildContext context,
       String title,
-      String iconPath,
+      String iconName,
       String route,
       ) {
-    // Map icon string to actual icon or asset
-    // For simplicity we use the icon string as asset name; you might need mapping
     return GestureDetector(
       onTap: () {
         // Navigate based on route
-        // For now, just show a snackbar
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Navigate to $title')),
         );
@@ -808,14 +815,10 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
-              child: SvgPicture.asset(
-                iconPath, // you may need to map icon name to asset
-                width: 24,
-                height: 24,
-                colorFilter: const ColorFilter.mode(
-                  Color(0xFF0A8FDC),
-                  BlendMode.srcIn,
-                ),
+              child: Icon(
+                _getIconData(iconName),
+                color: const Color(0xFF0A8FDC),
+                size: 24,
               ),
             ),
             const SizedBox(height: 6),
@@ -834,5 +837,19 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+  IconData _getIconData(String iconName) {
+    switch (iconName) {
+      case 'appointments':
+        return Icons.calendar_today;
+      case 'patients':
+        return Icons.people;
+      case 'prescriptions':
+        return Icons.medical_services;
+      case 'reports':
+        return Icons.analytics;
+      default:
+        return Icons.star;
+    }
   }
 }

@@ -56,24 +56,32 @@ class AppointmentModel {
   });
 
   factory AppointmentModel.fromJson(Map<String, dynamic> json) {
+    // Safe integer conversion
+    int _toInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     return AppointmentModel(
-      id: json['id'] ?? 0,
+      id: _toInt(json['id']),
       bookingId: json['booking_id']?.toString() ?? '',
       consultType: json['consult_type']?.toString() ?? '',
-      userId: json['user_id'] ?? 0,
-      specialityId: json['speciality_id'] ?? 0,
-      doctorId: json['doctor_id'] ?? 0,
-      slotId: json['slot_id'] ?? 0,
+      userId: _toInt(json['user_id']),
+      specialityId: _toInt(json['speciality_id']),
+      doctorId: _toInt(json['doctor_id']),
+      slotId: _toInt(json['slot_id']),
       time: json['time']?.toString() ?? '',
       date: json['date']?.toString() ?? '',
       mobile: json['mobile']?.toString() ?? '',
-      callStatus: json['call_status'] ?? 0,
-      familyMemberId: json['family_member_id'] ?? 0,
-      fee: json['fee'] ?? 0,
-      consultationFee: json['consultation_fee'] ?? 0,
-      couponId: json['coupon_id'] ?? 0,
-      couponPercentage: json['coupon_percentage'] ?? 0,
-      couponDiscount: json['coupon_discount'] ?? 0,
+      callStatus: _toInt(json['call_status']),
+      familyMemberId: _toInt(json['family_member_id']),
+      fee: _toInt(json['fee']),
+      consultationFee: _toInt(json['consultation_fee']),
+      couponId: _toInt(json['coupon_id']),
+      couponPercentage: _toInt(json['coupon_percentage']),
+      couponDiscount: _toInt(json['coupon_discount']),
       specialityName: json['speciality_name']?.toString() ?? '',
       doctorName: json['doctor_name']?.toString() ?? '',
       patientImage: json['patient_image']?.toString() ?? '',

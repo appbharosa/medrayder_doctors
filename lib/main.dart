@@ -1,10 +1,15 @@
+import 'dart:io';
+
 import 'package:doctors/utils/services/push_notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get/get.dart';
+import 'core/app_urls/app_urls.dart';
 import 'core/di/injection.dart' as di;
 import 'core/manager/user_manager.dart';
+import 'core/network/dio_client.dart';
 import 'features/auth/login/bloc/login_bloc.dart';
 import 'features/auth/login/pages/login_page.dart';
 import 'features/auth/otp/bloc/otp_bloc.dart';
@@ -15,6 +20,29 @@ import 'firebase_options.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+// void _setupFcmTokenRefresh() {
+//   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+//     final user = UserManager().currentUser;
+//     if (user != null) {
+//       final deviceType = Platform.isAndroid ? 'android' : 'ios';
+//       final dio = DioClient().dio; // or get from GetIt
+//       try {
+//         await dio.post(
+//           AppUrls.fcmToken,
+//           data: {
+//             'device_token': newToken,
+//             'device_type': deviceType,
+//           },
+//         );
+//         print("✅ FCM token refreshed: $newToken");
+//       } catch (e) {
+//         print("❌ FCM token refresh failed: $e");
+//       }
+//     }
+//   });
+// }
+
+// Call this in main() after Firebase initialization
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

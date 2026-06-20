@@ -69,6 +69,23 @@ class AuthApiService {
     }
   }
 
+  // In AuthApiService class
+  Future<void> registerFcmToken(String token, String deviceType) async {
+    try {
+      final response = await dio.post(
+        AppUrls.fcmToken,
+        data: {
+          'device_token': token,
+          'device_type': deviceType,
+        },
+      );
+      // Optional: check status if needed
+    } on DioException catch (e) {
+      // Log error but don't throw – failing to register token shouldn't break login
+      print("FCM token registration error: ${_handleError(e)}");
+    }
+  }
+
   String _handleError(DioException error) {
     if (error.response != null) {
       return error.response?.data['message'] ?? 'Server error occurred';

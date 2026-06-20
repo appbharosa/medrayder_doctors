@@ -3,8 +3,6 @@ import 'package:dio/dio.dart';
 import '../../core/app_urls/app_urls.dart';
 import '../models/create_room_request_model.dart';
 import '../models/create_room_response_model.dart';
-import '../models/join_room_request_model.dart';
-import '../models/join_room_response_model.dart';
 
 
 class CallApiService {
@@ -12,6 +10,7 @@ class CallApiService {
 
   CallApiService(this.dio);
 
+  // Only one API call needed – returns both tokens
   Future<CreateRoomResponseModel> createRoom(CreateRoomRequestModel request) async {
     try {
       final response = await dio.post(
@@ -28,36 +27,41 @@ class CallApiService {
     }
   }
 
-  Future<JoinRoomResponseModel> joinRoom(JoinRoomRequestModel request) async {
-    try {
-      final response = await dio.post(
-        AppUrls.joinRoom,
-        data: request.toJson(),
-      );
-      if (response.statusCode == 200 && response.data['status'] == 200) {
-        return JoinRoomResponseModel.fromJson(response.data);
-      } else {
-        throw Exception(response.data['message'] ?? 'Failed to join room');
-      }
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
-  }
+  // End call – unchanged
+// End call with extensive debugging
   Future<Map<String, dynamic>> endCall(String roomId, String callId) async {
+    print('🔴 END CALL REQUEST: roomId=$roomId, callId=$callId');
+    print('🔴 URL: ${AppUrls.endCall}/$roomId');
+    print('🔴 BODY: {"room_id": "$roomId", "call_id": "$callId"}');
+
     try {
       final response = await dio.delete(
         '${AppUrls.endCall}/$roomId',
         data: {'room_id': roomId, 'call_id': callId},
       );
-      // Even if status is 404, we can still treat as success if we want? But we'll treat non-200 as error.
+      print('🔴 END CALL RESPONSE: status=${response.statusCode}');
+      print('🔴 END CALL RESPONSE DATA: ${response.data}');
       if (response.statusCode == 200 || response.statusCode == 404) {
-        // For 404, we might still want to close the call, so return success.
         return response.data as Map<String, dynamic>;
       } else {
         throw Exception('Failed to end call: ${response.statusCode}');
       }
     } on DioException catch (e) {
+      print('❌ END CALL DIO ERROR');
+      print('❌ Error type: ${e.type}');
+      print('❌ Error message: ${e.message}');
+      if (e.response != null) {
+        print('❌ Response status: ${e.response?.statusCode}');
+        print('❌ Response data: ${e.response?.data}');
+      }
+      if (e.error != null) {
+        print('❌ Error object: ${e.error}');
+      }
       throw _handleError(e);
+    } catch (e, stack) {
+      print('❌ END CALL UNKNOWN ERROR: $e');
+      print('❌ Stack trace: $stack');
+      rethrow;
     }
   }
 

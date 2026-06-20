@@ -1,4 +1,5 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../core/manager/user_manager.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_api_service.dart';
@@ -15,6 +16,19 @@ class AuthRepositoryImpl implements AuthRepository {
 
   AuthRepositoryImpl({required this.apiService, required this.userManager});
 
+  // In AuthRepositoryImpl
+  Future<void> _registerFcmToken() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && userManager.currentUser != null) {
+        final deviceType = Platform.isAndroid ? 'android' : 'ios';
+        await apiService.registerFcmToken(token, deviceType);
+      }
+    } catch (e) {
+      print("FCM token registration failed: $e");
+    }
+  }
+
   @override
   Future<LoginResponseModel> sendOtp(String phone, String type) async {
     final request = LoginRequestModel(phone: phone, type: type);
@@ -26,6 +40,7 @@ class AuthRepositoryImpl implements AuthRepository {
     final request = OtpVerifyRequestModel(doctorId: doctorId, otp: otp, type: type);
     final user = await apiService.verifyOtp(request);
     await saveUserData(user);
+    await _registerFcmToken();
     return user;
   }
   @override

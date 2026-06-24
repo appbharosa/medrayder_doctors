@@ -27,17 +27,14 @@ class CallApiService {
     }
   }
 
-  // End call – unchanged
-// End call with extensive debugging
   Future<Map<String, dynamic>> endCall(String roomId, String callId) async {
     print('🔴 END CALL REQUEST: roomId=$roomId, callId=$callId');
     print('🔴 URL: ${AppUrls.endCall}/$roomId');
-    print('🔴 BODY: {"room_id": "$roomId", "call_id": "$callId"}');
 
     try {
+      // ✅ Only URL – no body (room_id already in path)
       final response = await dio.delete(
         '${AppUrls.endCall}/$roomId',
-        data: {'room_id': roomId, 'call_id': callId},
       );
       print('🔴 END CALL RESPONSE: status=${response.statusCode}');
       print('🔴 END CALL RESPONSE DATA: ${response.data}');
@@ -47,20 +44,10 @@ class CallApiService {
         throw Exception('Failed to end call: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      print('❌ END CALL DIO ERROR');
-      print('❌ Error type: ${e.type}');
-      print('❌ Error message: ${e.message}');
-      if (e.response != null) {
-        print('❌ Response status: ${e.response?.statusCode}');
-        print('❌ Response data: ${e.response?.data}');
-      }
-      if (e.error != null) {
-        print('❌ Error object: ${e.error}');
-      }
+      // ... error logging ...
       throw _handleError(e);
     } catch (e, stack) {
-      print('❌ END CALL UNKNOWN ERROR: $e');
-      print('❌ Stack trace: $stack');
+      // ...
       rethrow;
     }
   }

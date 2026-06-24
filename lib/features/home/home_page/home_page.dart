@@ -243,41 +243,67 @@ class _HomePageState extends State<HomePage> {
           ),
 
           // 2. Stats Row – Four cards
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding:  EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
               children: [
-                _statCard(
-                  context,
-                  "Today's Appointments",
-                  data.result.appointmentsCount.toString(),
-                  Icons.calendar_today,
-                  const Color(0xFF0A8FDC),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _statCard(
+                        context,
+                        "Today's Appointments",
+                        data.result.appointmentsCount.toString(),
+                        'assets/appointment.svg',
+                        const Color(0xFF0A8FDC),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _statCard(
+                        context,
+                        "Patients This Month",
+                        data.result.todayAppointments.toString(),
+                        'assets/appointment.svg',
+                        const Color(0xFF4CAF50),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                _statCard(
-                  context,
-                  "Patients This Month",
-                  data.result.todayAppointments.toString(),
-                  Icons.people,
-                  const Color(0xFF4CAF50), // green
-                ),
-                const SizedBox(width: 12),
-                _statCard(
-                  context,
-                  "Earnings This Month",
-                  "₹${data.result.appointmentsCount.toStringAsFixed(0)}",
-                  Icons.currency_rupee,
-                  const Color(0xFFFF9800), // orange
-                ),
-                const SizedBox(width: 12),
-                _statCard(
-                  context,
-                  "Your Rating",
-                  data.result.appointmentsCount.toStringAsFixed(1) + " ★",
-                  Icons.star,
-                  const Color(0xFFFFC107), // yellow/gold
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _statCard(
+                        context,
+                        "Earnings This Month",
+                        "₹${data.result.appointmentsCount.toStringAsFixed(0)}",
+                        'assets/saving.svg',
+                        const Color(0xFFFF9800),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _statCard(
+                        context,
+                        "Your Rating",
+                        data.result.appointmentsCount.toStringAsFixed(1) + " ★",
+                        'assets/customer-review.svg',
+                        const Color(0xFFFFC107),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -727,57 +753,59 @@ class _HomePageState extends State<HomePage> {
       BuildContext context,
       String title,
       String value,
-      IconData icon,
+      String svgAsset,      // path to SVG asset
       Color color,
       ) {
-    return SizedBox(
-      width: 110,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.shade100,
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade100,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 20),
+            child: SvgPicture.asset(
+              svgAsset,
+              height: 20,
+              width: 20,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
             ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-              overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
             ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
-                fontWeight: FontWeight.w500,
-              ),
-              overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

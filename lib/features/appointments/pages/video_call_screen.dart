@@ -1,13 +1,18 @@
+import 'dart:async';
+
+import 'package:enx_flutter_plugin/enx_flutter_plugin.dart';
+import 'package:enx_uikit_flutter/utilities/enx_setting.dart';
 import 'package:flutter/material.dart';
 import 'package:enx_uikit_flutter/enx_uikit_flutter.dart';
-import '../../../core/app_urls/app_urls.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/di/injection.dart' as di;
-import '../../../core/network/dio_client.dart';
 import '../../../data/models/appointment_model.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../domain/repositories/call_repository.dart';
 import '../call_bloc/call_bloc.dart';
 import '../call_bloc/call_event.dart';
 import '../call_bloc/call_state.dart';
+
 
 
 class VideoCallScreen extends StatefulWidget {
@@ -30,51 +35,159 @@ class VideoCallScreen extends StatefulWidget {
   State<VideoCallScreen> createState() => _VideoCallScreenState();
 }
 
-class _VideoCallScreenState extends State<VideoCallScreen> {
+class _VideoCallScreenState extends State<VideoCallScreen>
+    with WidgetsBindingObserver {
   EnxVideoView? _enxVideoView;
   bool _isCallActive = true;
   bool _isEndingCall = false;
   bool _isDisposed = false;
+  bool _permissionsGranted = false;
+  bool _permissionChecked = false;
+  bool _isSpeakerOn = true;
+  late final CallRepository _callRepository;
+  bool _viewCreated = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeVideoCall();
+    _callRepository = di.sl<CallRepository>();
+    WidgetsBinding.instance.addObserver(this);
+    _checkPermissions();
   }
 
-  void _initializeVideoCall() {
-    if (widget.token.isEmpty) {
-      _handleCallEnd('Token is missing');
-      return;
-    }
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _isDisposed = true;
+    _isCallActive = false;
+    try { EnxRtc.disconnect(); } catch (_) {}
+    _enxVideoView = null;
+    super.dispose();
+  }
 
-    _enxVideoView = EnxVideoView(
-      key: ValueKey('enx_${widget.roomId}_${DateTime.now().millisecondsSinceEpoch}'),
-      token: widget.token,
-      embedUrl: '',
-      disconnect: (map) {
-        print('🔴 Disconnected: $map');
-        _handleCallEnd('Call ended by remote');
-      },
-      connectError: (map) {
-        print('❌ Connection error: $map');
-        _handleCallEnd('Connection error: ${map['msg']}');
-      },
-      onPageSlide: (eventName, isShow) {
-        print('📄 Page slide: $eventName, isShow: $isShow');
-      },
-      onUserDataReceived: (map) {
-        print('👤 User data received: $map');
-      },
-      connectToRoom: (map) {
-        print('🔗 Connect to room called: $map');
-      },
-      onCaptureView: (base64bitmap) {
-        print('📸 Screenshot captured');
-      },
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Optional: handle resume
+    }
+  }
+
+  // ─── Permissions ──────────────────────────────────────────────
+  Future<void> _checkPermissions() async {
+    try {
+      final statuses = await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+
+      final cameraGranted = statuses[Permission.camera]?.isGranted ?? false;
+      final micGranted = statuses[Permission.microphone]?.isGranted ?? false;
+
+      if (cameraGranted && micGranted) {
+        if (!mounted) return;
+        setState(() {
+          _permissionsGranted = true;
+          _permissionChecked = true;
+        });
+        _createVideoView();
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _permissionsGranted = false;
+          _permissionChecked = true;
+        });
+        _showPermissionDialog();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _permissionsGranted = false;
+        _permissionChecked = true;
+      });
+    }
+  }
+
+  void _showPermissionDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text('Permissions Required'),
+        content: const Text(
+          'Camera and microphone permissions are needed for video calls.\n\n'
+              'Please grant them in your device settings and try again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
     );
   }
 
+  // ─── Create EnableX View (once) ──────────────────────────────
+  void _createVideoView() {
+    if (_viewCreated || widget.token.isEmpty) {
+      if (widget.token.isEmpty) _handleCallEnd('Token missing');
+      return;
+    }
+
+    try {
+      _enxVideoView = EnxVideoView(
+        // Stable key to avoid recreation
+        key: ValueKey('enx_${widget.roomId}_${widget.callId}'),
+        token: widget.token,
+        embedUrl: '',
+        disconnect: (map) {
+          debugPrint('Disconnected: $map');
+          if (!_isDisposed) {
+            _callFullyEnded('Call ended');
+          }
+        },
+        connectError: (map) {
+          debugPrint('Connect error: $map');
+          if (!_isDisposed) {
+            _handleCallEnd(map['msg']?.toString() ?? 'Connection failed');
+          }
+        },
+        connectToRoom: (map) {
+          debugPrint('Connected successfully');
+          // Do NOT call setState here – keeps UI stable
+        },
+        onPageSlide: (_, __) {},
+        onUserDataReceived: (_) {},
+        onCaptureView: (_) {},
+      );
+
+      _viewCreated = true;
+      // Only setState once to show the view
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('EnableX init error: $e');
+      _handleCallEnd('Video initialization failed');
+    }
+  }
+
+  // ─── Speaker Toggle ───────────────────────────────────────────
+  void _toggleSpeaker() {
+    setState(() => _isSpeakerOn = !_isSpeakerOn);
+    debugPrint('Speaker: ${_isSpeakerOn ? 'ON' : 'OFF'}');
+  }
+
+  // ─── End Call Logic ──────────────────────────────────────────
   void _handleCallEnd([String? reason]) {
     if (_isDisposed || !_isCallActive || _isEndingCall) return;
     _performEndCall(reason);
@@ -84,40 +197,25 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     if (_isEndingCall) return;
     setState(() => _isEndingCall = true);
 
-    // Attempt to use the BLoC, but catch if it's closed
-    bool apiCalled = false;
     try {
       widget.callBloc.add(EndCall(widget.roomId, widget.callId));
-      apiCalled = true;
-      print('✅ EndCall event added to BLoC');
-    } catch (e) {
-      print('❌ BLoC is closed, falling back to direct API call: $e');
-      // Fallback: call the API directly
-      _callEndApiDirectly();
+    } catch (_) {
+      _callEndApiViaRepository();
     }
 
-    // Fallback: if the BLoC doesn't respond within 5 seconds, force close
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(const Duration(seconds: 566), () {
       if (_isCallActive && !_isDisposed) {
         _callFullyEnded('Call ended (timeout)');
       }
     });
   }
 
-  // Direct API call as fallback
-  Future<void> _callEndApiDirectly() async {
-    print('🔴 END CALL REQUEST (direct): roomId=${widget.roomId}, callId=${widget.callId}');
+  Future<void> _callEndApiViaRepository() async {
     try {
-      final dio = di.sl<DioClient>().dio;
-      final response = await dio.delete(
-        '${AppUrls.endCall}/${widget.roomId}',
-        data: {'room_id': widget.roomId, 'call_id': widget.callId},
-      );
-      print('🔴 END CALL RESPONSE: ${response.statusCode}');
-      _callFullyEnded('Call ended successfully');
-    } catch (e) {
-      print('❌ Direct API call failed: $e');
-      _callFullyEnded('Call ended (fallback)');
+      await _callRepository.endCall(widget.roomId, widget.callId);
+      _callFullyEnded('Call ended');
+    } catch (_) {
+      _callFullyEnded('Call ended');
     }
   }
 
@@ -127,37 +225,46 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       _isCallActive = false;
       _isEndingCall = false;
     });
-    if (mounted && reason != null && reason.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(reason),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    try { EnxRtc.disconnect(); } catch (_) {}
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  // ─── UI ──────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    if (!_permissionChecked) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!_permissionsGranted) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.no_photography, size: 80, color: Colors.grey),
+              SizedBox(height: 16),
+              Text('Permissions required', style: TextStyle(color: Colors.grey, fontSize: 18)),
+            ],
+          ),
         ),
       );
     }
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) Navigator.pop(context);
-    });
-  }
 
-  @override
-  Widget build(BuildContext context) {
     return BlocProvider.value(
       value: widget.callBloc,
       child: BlocListener<CallBloc, CallState>(
         listener: (context, state) {
-          if (state is CallEnded) {
-            _callFullyEnded(state.message);
-          } else if (state is CallError) {
-            _callFullyEnded('Error ending call: ${state.error}');
+          if (state is CallEnded || state is CallError) {
+            _callFullyEnded();
           }
         },
         child: Scaffold(
           backgroundColor: Colors.black,
           appBar: AppBar(
-            backgroundColor: Colors.transparent,
+            backgroundColor: Colors.black,
             elevation: 0,
             leading: IconButton(
               icon: const Icon(Icons.close, color: Colors.white),
@@ -168,6 +275,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               style: const TextStyle(color: Colors.white),
             ),
             actions: [
+              IconButton(
+                icon: Icon(
+                  _isSpeakerOn ? Icons.volume_up : Icons.volume_off,
+                  color: Colors.white,
+                ),
+                onPressed: _toggleSpeaker,
+              ),
               IconButton(
                 icon: _isEndingCall
                     ? const SizedBox(
@@ -183,31 +297,32 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               ),
             ],
           ),
-          body: _isCallActive && _enxVideoView != null
-              ? _enxVideoView!
-              : Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.call_end, color: Colors.red, size: 60),
-                const SizedBox(height: 16),
-                Text(
-                  _isCallActive ? 'Loading...' : 'Call Ended',
-                  style: const TextStyle(color: Colors.white, fontSize: 18),
-                ),
-              ],
+          body: Container(
+            width: double.infinity,
+            height: double.infinity,
+            color: Colors.black,
+            child: _enxVideoView != null
+                ? SizedBox.expand(child: _enxVideoView!)
+                : const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 20),
+                  Text(
+                    'Joining Room...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _isDisposed = true;
-    _isCallActive = false;
-    _enxVideoView = null;
-    super.dispose();
   }
 }

@@ -45,8 +45,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _appointmentBloc.close();
-    _callBloc.close();
+    // _appointmentBloc.close();
+    // _callBloc.close();
     super.dispose();
   }
 
@@ -77,26 +77,20 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       _showSnackBar(context, 'User not logged in');
       return;
     }
-    // ✅ Ensure the appointment IDs are valid numbers (they are now ints)
     if (appointment.userId == 0 || appointment.id == 0) {
       _showSnackBar(context, 'Invalid appointment data');
       return;
     }
-
     _currentAppointment = appointment;
-
     final request = CreateRoomRequestModel(
       type: user.type,
       doctorId: user.id,
-      patientId: appointment.userId,   // now safely an int
-      appointmentId: appointment.id,   // now safely an int
+      patientId: appointment.userId,
+      appointmentId: appointment.id,
       duration: 30,
     );
-
     _callBloc.add(StartVideoCall(request));
-  }
-
-  void _showSnackBar(BuildContext context, String message) {
+  }  void _showSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

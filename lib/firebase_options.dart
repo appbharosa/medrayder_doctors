@@ -60,11 +60,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDOyoFW5VwMuBJrImvEBJ_S3DU69kpWURo',
-    appId: '1:557889947661:ios:7c366b570e9289b587ad44',
+    appId: '1:557889947661:ios:b4db6d7b2a26075887ad44',
     messagingSenderId: '557889947661',
     projectId: 'medrayder-flutter',
     storageBucket: 'medrayder-flutter.firebasestorage.app',
-    iosBundleId: 'com.medrayder.doctors',
+    iosBundleId: 'com.medrayder.meddoctors',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(

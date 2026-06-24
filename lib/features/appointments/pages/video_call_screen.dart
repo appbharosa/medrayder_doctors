@@ -14,7 +14,6 @@ import '../call_bloc/call_event.dart';
 import '../call_bloc/call_state.dart';
 
 
-
 class VideoCallScreen extends StatefulWidget {
   final String token;
   final String roomId;

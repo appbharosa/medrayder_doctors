@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:enx_flutter_plugin/base.dart';
 import 'package:enx_flutter_plugin/enx_flutter_plugin.dart';
 import 'package:enx_uikit_flutter/utilities/enx_setting.dart';
 import 'package:flutter/material.dart';
@@ -7,11 +8,8 @@ import 'package:enx_uikit_flutter/enx_uikit_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/di/injection.dart' as di;
 import '../../../data/models/appointment_model.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../domain/repositories/call_repository.dart';
-import '../call_bloc/call_bloc.dart';
-import '../call_bloc/call_event.dart';
-import '../call_bloc/call_state.dart';
+
+import 'package:enx_flutter_plugin/enx_player_widget.dart';
 
 
 class VideoCallScreen extends StatefulWidget {
@@ -19,7 +17,6 @@ class VideoCallScreen extends StatefulWidget {
   final String roomId;
   final String callId;
   final AppointmentModel appointment;
-  final CallBloc callBloc;
 
   const VideoCallScreen({
     Key? key,
@@ -27,7 +24,6 @@ class VideoCallScreen extends StatefulWidget {
     required this.roomId,
     required this.callId,
     required this.appointment,
-    required this.callBloc,
   }) : super(key: key);
 
   @override
@@ -36,291 +32,362 @@ class VideoCallScreen extends StatefulWidget {
 
 class _VideoCallScreenState extends State<VideoCallScreen>
     with WidgetsBindingObserver {
-  EnxVideoView? _enxVideoView;
-  bool _isCallActive = true;
-  bool _isEndingCall = false;
-  bool _isDisposed = false;
   bool _permissionsGranted = false;
   bool _permissionChecked = false;
+  bool _isEndingCall = false;
   bool _isSpeakerOn = true;
-  late final CallRepository _callRepository;
-  bool _viewCreated = false;
+  bool _isRoomConnected = false;
+  bool _isAudioMuted = false;
+  bool _isVideoMuted = false;
+  bool _localVideoRendered = false;
+  int? _localStreamId;
+  int? _remoteStreamId; // ✅ added
 
   @override
   void initState() {
     super.initState();
-    _callRepository = di.sl<CallRepository>();
     WidgetsBinding.instance.addObserver(this);
-    _checkPermissions();
+    _requestPermissions();
+    _addEnxRtcEventHandlers();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _isDisposed = true;
-    _isCallActive = false;
+    _isEndingCall = true;
     try { EnxRtc.disconnect(); } catch (_) {}
-    _enxVideoView = null;
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Optional: handle resume
-    }
-  }
+  Future<void> _requestPermissions() async {
+    final result = await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
 
-  // ─── Permissions ──────────────────────────────────────────────
-  Future<void> _checkPermissions() async {
-    try {
-      final statuses = await [
-        Permission.camera,
-        Permission.microphone,
-      ].request();
+    final camera = result[Permission.camera]?.isGranted ?? false;
+    final mic = result[Permission.microphone]?.isGranted ?? false;
 
-      final cameraGranted = statuses[Permission.camera]?.isGranted ?? false;
-      final micGranted = statuses[Permission.microphone]?.isGranted ?? false;
+    if (!mounted) return;
 
-      if (cameraGranted && micGranted) {
-        if (!mounted) return;
-        setState(() {
-          _permissionsGranted = true;
-          _permissionChecked = true;
-        });
-        _createVideoView();
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _permissionsGranted = false;
-          _permissionChecked = true;
-        });
-        _showPermissionDialog();
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _permissionsGranted = false;
-        _permissionChecked = true;
-      });
+    setState(() {
+      _permissionsGranted = camera && mic;
+      _permissionChecked = true;
+    });
+
+    if (_permissionsGranted) {
+      _joinRoom();
+    } else {
+      _showPermissionDialog();
     }
   }
 
   void _showPermissionDialog() {
-    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: const Text('Permissions Required'),
-        content: const Text(
-          'Camera and microphone permissions are needed for video calls.\n\n'
-              'Please grant them in your device settings and try again.',
-        ),
+        title: const Text("Permissions Required"),
+        content: const Text("Please allow camera and microphone permissions."),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (mounted) Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              openAppSettings();
+              await openAppSettings();
             },
-            child: const Text('Open Settings'),
+            child: const Text("Open Settings"),
           ),
         ],
       ),
     );
   }
 
-  // ─── Create EnableX View (once) ──────────────────────────────
-  void _createVideoView() {
-    if (_viewCreated || widget.token.isEmpty) {
-      if (widget.token.isEmpty) _handleCallEnd('Token missing');
-      return;
-    }
+  Future<void> _joinRoom() async {
+    if (_isEndingCall) return;
+
+    Map<String, dynamic> videoSize = {
+      'minWidth': 320,
+      'minHeight': 180,
+      'maxWidth': 1280,
+      'maxHeight': 720,
+    };
+
+    Map<String, dynamic> localInfo = {
+      'audio': true,
+      'video': true,
+      'data': true,
+      'framerate': 30,
+      'maxVideoBW': 1500,
+      'minVideoBW': 150,
+      'audioMuted': _isAudioMuted,
+      'videoMuted': _isVideoMuted,
+      'name': widget.appointment.patientName,
+      'videoSize': videoSize,
+    };
+
+    Map<String, dynamic> roomInfo = {
+      'allow_reconnect': true,
+      'number_of_attempts': 3,
+      'timeout_interval': 15,
+    };
 
     try {
-      _enxVideoView = EnxVideoView(
-        // Stable key to avoid recreation
-        key: ValueKey('enx_${widget.roomId}_${widget.callId}'),
-        token: widget.token,
-        embedUrl: '',
-        disconnect: (map) {
-          debugPrint('Disconnected: $map');
-          if (!_isDisposed) {
-            _callFullyEnded('Call ended');
-          }
-        },
-        connectError: (map) {
-          debugPrint('Connect error: $map');
-          if (!_isDisposed) {
-            _handleCallEnd(map['msg']?.toString() ?? 'Connection failed');
-          }
-        },
-        connectToRoom: (map) {
-          debugPrint('Connected successfully');
-          // Do NOT call setState here – keeps UI stable
-        },
-        onPageSlide: (_, __) {},
-        onUserDataReceived: (_) {},
-        onCaptureView: (_) {},
-      );
-
-      _viewCreated = true;
-      // Only setState once to show the view
-      if (mounted) setState(() {});
+      await EnxRtc.joinRoom(widget.token, localInfo, roomInfo, []);
+      debugPrint("✅ Joined room");
+      if (mounted) setState(() => _isRoomConnected = true);
+      EnxRtc.publish();
     } catch (e) {
-      debugPrint('EnableX init error: $e');
-      _handleCallEnd('Video initialization failed');
+      debugPrint("❌ Join error: $e");
+      if (mounted) _endCall();
     }
   }
 
-  // ─── Speaker Toggle ───────────────────────────────────────────
-  void _toggleSpeaker() {
-    setState(() => _isSpeakerOn = !_isSpeakerOn);
-    debugPrint('Speaker: ${_isSpeakerOn ? 'ON' : 'OFF'}');
+  void _addEnxRtcEventHandlers() {
+    EnxRtc.onRoomConnected = (map) {
+      debugPrint("Room connected: $map");
+      if (mounted) setState(() => _isRoomConnected = true);
+      EnxRtc.publish();
+    };
+
+    EnxRtc.onPublishedStream = (map) {
+      debugPrint("Published: $map");
+      final id = _parseInt(map['streamId']);
+      if (id != null) {
+        _localStreamId = id;
+        EnxRtc.setupVideo(0, 0, true, 300, 200);
+        setState(() => _localVideoRendered = true);
+      }
+    };
+
+    // ✅ Only add remote streams
+    EnxRtc.onStreamAdded = (map) {
+      debugPrint("Stream added: $map");
+      final id = _parseInt(map['streamId']);
+      if (id != null && id != _localStreamId) {
+        // Subscribe to the stream
+        EnxRtc.subscribe(id.toString());
+      }
+    };
+
+    // ✅ Set remote stream ID when subscribed
+    EnxRtc.onSubscribedStream = (map) {
+      debugPrint("Subscribed: $map");
+      final id = _parseInt(map['streamId']);
+      if (id != null && id != _localStreamId) {
+        setState(() {
+          _remoteStreamId = id;
+        });
+      }
+    };
+
+    // Also listen to active talker list as fallback
+    EnxRtc.onActiveTalkerList = (map) {
+      debugPrint("Active talkers: $map");
+      final list = map['activeList'] as List?;
+      if (list != null) {
+        for (final item in list) {
+          final id = _parseInt(item['streamId']);
+          if (id != null && id != _localStreamId && _remoteStreamId == null) {
+            setState(() {
+              _remoteStreamId = id;
+            });
+          }
+        }
+      }
+    };
+
+    EnxRtc.onRoomDisConnected = (map) {
+      debugPrint("Disconnected: $map");
+      if (mounted) _endCall();
+    };
+
+    EnxRtc.onRoomError = (map) {
+      debugPrint("Room error: $map");
+      if (mounted) _endCall();
+    };
+
+    EnxRtc.onAudioEvent = (map) {
+      if (!mounted) return;
+      setState(() {
+        _isAudioMuted = map['msg'].toString() == "Audio Off";
+      });
+    };
+
+    EnxRtc.onVideoEvent = (map) {
+      if (!mounted) return;
+      setState(() {
+        _isVideoMuted = map['msg'].toString() == "Video Off";
+      });
+    };
+
+    EnxRtc.onUserDisConnected = (map) {
+      final id = _parseInt(map['streamId']);
+      if (id != null && id == _remoteStreamId) {
+        setState(() {
+          _remoteStreamId = null;
+        });
+      }
+    };
   }
 
-  // ─── End Call Logic ──────────────────────────────────────────
-  void _handleCallEnd([String? reason]) {
-    if (_isDisposed || !_isCallActive || _isEndingCall) return;
-    _performEndCall(reason);
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
-  void _performEndCall([String? reason]) {
+  void _endCall() {
     if (_isEndingCall) return;
     setState(() => _isEndingCall = true);
-
-    try {
-      widget.callBloc.add(EndCall(widget.roomId, widget.callId));
-    } catch (_) {
-      _callEndApiViaRepository();
-    }
-
-    Future.delayed(const Duration(seconds: 566), () {
-      if (_isCallActive && !_isDisposed) {
-        _callFullyEnded('Call ended (timeout)');
-      }
-    });
-  }
-
-  Future<void> _callEndApiViaRepository() async {
-    try {
-      await _callRepository.endCall(widget.roomId, widget.callId);
-      _callFullyEnded('Call ended');
-    } catch (_) {
-      _callFullyEnded('Call ended');
-    }
-  }
-
-  void _callFullyEnded([String? reason]) {
-    if (_isDisposed || !_isCallActive) return;
-    setState(() {
-      _isCallActive = false;
-      _isEndingCall = false;
-    });
     try { EnxRtc.disconnect(); } catch (_) {}
-
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    if (mounted) Navigator.pop(context);
   }
 
-  // ─── UI ──────────────────────────────────────────────────────
+  void _toggleAudio() {
+    EnxRtc.muteSelfAudio(!_isAudioMuted);
+    setState(() => _isAudioMuted = !_isAudioMuted);
+  }
+
+  void _toggleVideo() {
+    EnxRtc.muteSelfVideo(!_isVideoMuted);
+    setState(() => _isVideoMuted = !_isVideoMuted);
+  }
+
+  Future<void> _toggleCamera() async {
+    try { await EnxRtc.switchCamera(); } catch (e) { debugPrint("Camera switch error: $e"); }
+  }
+
+  void _toggleSpeaker() => setState(() => _isSpeakerOn = !_isSpeakerOn);
+
   @override
   Widget build(BuildContext context) {
     if (!_permissionChecked) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
     if (!_permissionsGranted) {
       return const Scaffold(
+        backgroundColor: Colors.black,
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.no_photography, size: 80, color: Colors.grey),
-              SizedBox(height: 16),
-              Text('Permissions required', style: TextStyle(color: Colors.grey, fontSize: 18)),
-            ],
-          ),
+          child: Text("Permissions Required", style: TextStyle(color: Colors.white)),
         ),
       );
     }
 
-    return BlocProvider.value(
-      value: widget.callBloc,
-      child: BlocListener<CallBloc, CallState>(
-        listener: (context, state) {
-          if (state is CallEnded || state is CallError) {
-            _callFullyEnded();
-          }
-        },
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
-              onPressed: () => _handleCallEnd('Call ended by user'),
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Remote video (full screen)
+          if (_remoteStreamId != null)
+            Positioned.fill(
+              child: EnxPlayerWidget(
+                _remoteStreamId!,
+                local: false,
+                width: MediaQuery.of(context).size.width.toInt(),
+                height: MediaQuery.of(context).size.height.toInt(),
+                mScalingType: ScalingType.SCALE_ASPECT_FIT,
+              ),
+            )
+          else
+            const Center(
+              child: Text(
+                "Waiting for participant...",
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
             ),
-            title: Text(
-              widget.appointment.patientName,
-              style: const TextStyle(color: Colors.white),
-            ),
-            actions: [
-              IconButton(
-                icon: Icon(
-                  _isSpeakerOn ? Icons.volume_up : Icons.volume_off,
-                  color: Colors.white,
+
+          // Local preview (small)
+          if (_isRoomConnected && _localStreamId != null)
+            Positioned(
+              top: 70,
+              right: 16,
+              child: Container(
+                width: 120,
+                height: 170,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white, width: 2),
                 ),
-                onPressed: _toggleSpeaker,
-              ),
-              IconButton(
-                icon: _isEndingCall
-                    ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: EnxPlayerWidget(
+                    _localStreamId!, // use the actual local stream ID
+                    local: true,
+                    width: 120,
+                    height: 170,
+                    mScalingType: ScalingType.SCALE_ASPECT_BALANCED,
                   ),
-                )
-                    : const Icon(Icons.call_end, color: Colors.red),
-                onPressed: _isEndingCall ? null : () => _handleCallEnd('Call ended by user'),
+                ),
               ),
-            ],
-          ),
-          body: Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.black,
-            child: _enxVideoView != null
-                ? SizedBox.expand(child: _enxVideoView!)
-                : const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            ),
+
+          // Top bar
+          Positioned(
+            top: 40,
+            left: 0,
+            right: 0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  CircularProgressIndicator(color: Colors.white),
-                  SizedBox(height: 20),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: _endCall,
+                  ),
                   Text(
-                    'Joining Room...',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    widget.appointment.patientName,
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.call_end, color: Colors.red, size: 32),
+                    onPressed: _endCall,
                   ),
                 ],
               ),
             ),
           ),
+
+          // Bottom controls
+          Positioned(
+            bottom: 30,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _controlButton(Icons.mic, _isAudioMuted, _toggleAudio),
+                _controlButton(Icons.videocam, _isVideoMuted, _toggleVideo),
+                _controlButton(Icons.call_end, false, _endCall, isRed: true),
+                _controlButton(Icons.switch_camera, false, _toggleCamera),
+                _controlButton(Icons.volume_up, _isSpeakerOn, _toggleSpeaker),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _controlButton(IconData icon, bool isActive, VoidCallback onTap, {bool isRed = false}) {
+    return CircleAvatar(
+      radius: isRed ? 32 : 28,
+      backgroundColor: isRed ? Colors.red : Colors.black54,
+      child: IconButton(
+        icon: Icon(
+          icon,
+          color: isRed ? Colors.white : (isActive ? Colors.white : Colors.grey),
         ),
+        onPressed: onTap,
       ),
     );
   }

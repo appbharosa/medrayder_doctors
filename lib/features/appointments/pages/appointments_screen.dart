@@ -156,7 +156,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   token: result.doctorToken,   // 👈 doctor token
                   roomId: result.roomId,
                   callId: result.callId,
-                  callBloc: _callBloc,
+            //      callBloc: _callBloc,
                   appointment: appointment,
                 ),
               ),

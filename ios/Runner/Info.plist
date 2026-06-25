@@ -18,17 +18,17 @@
 	<string>doctors</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
-	<key>io.flutter.embedded_views_preview</key>
-    <true/>
-    <key>UIViewControllerBasedStatusBarAppearance</key>
-    <false/>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>IOSSurface</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>Metal</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
@@ -41,6 +41,27 @@
 	<string>We need camera access for video calls</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need microphone access for video calls</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>flutter</string>
+					<key>UISceneDelegateClassName</key>
+					<string>FlutterSceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>
@@ -66,5 +87,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>io.flutter.embedded_views_preview</key>
+	<true/>
 </dict>
 </plist>

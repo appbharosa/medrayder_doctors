@@ -25,11 +25,17 @@ class DashboardResultModel {
   @JsonKey(name: 'quick_actions')
   final List<QuickActionModel> quickActions;
   @JsonKey(name: 'today_appointments')
-  final List<dynamic> todayAppointments; // adjust if you have a model
+  final List<dynamic> todayAppointments;
   @JsonKey(name: 'appointments_count')
   final int appointmentsCount;
   @JsonKey(name: 'today_date')
   final String todayDate;
+  @JsonKey(name: 'today_ratings')
+  final int todayRatings;
+  @JsonKey(name: 'earning_this_month')
+  final int earningThisMonth;
+  @JsonKey(name: 'patients_this_month')
+  final int patientsThisMonth;
 
   DashboardResultModel({
     required this.userInfo,
@@ -37,6 +43,9 @@ class DashboardResultModel {
     required this.todayAppointments,
     required this.appointmentsCount,
     required this.todayDate,
+    this.todayRatings = 0,
+    this.earningThisMonth = 0,
+    this.patientsThisMonth = 0,
   });
 
   factory DashboardResultModel.fromJson(Map<String, dynamic> json) =>

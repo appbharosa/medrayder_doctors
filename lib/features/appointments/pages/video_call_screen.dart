@@ -8,8 +8,12 @@ import 'package:enx_uikit_flutter/enx_uikit_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/di/injection.dart' as di;
 import '../../../data/models/appointment_model.dart';
-
 import 'package:enx_flutter_plugin/enx_player_widget.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../call_bloc/call_bloc.dart';
+import '../call_bloc/call_event.dart';
+import '../call_bloc/call_state.dart';
+
 
 
 class VideoCallScreen extends StatefulWidget {
@@ -41,11 +45,15 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   bool _isVideoMuted = false;
   bool _localVideoRendered = false;
   int? _localStreamId;
-  int? _remoteStreamId; // ✅ added
+  int? _remoteStreamId;
+  Timer? _endCallTimeoutTimer;
+  late final CallBloc _callBloc;
+  bool _hasDisconnected = false;
 
   @override
   void initState() {
     super.initState();
+    _callBloc = di.sl<CallBloc>();
     WidgetsBinding.instance.addObserver(this);
     _requestPermissions();
     _addEnxRtcEventHandlers();
@@ -54,11 +62,17 @@ class _VideoCallScreenState extends State<VideoCallScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _endCallTimeoutTimer?.cancel();
     _isEndingCall = true;
-    try { EnxRtc.disconnect(); } catch (_) {}
+    // Only disconnect if not already done and room was connected
+    if (!_hasDisconnected && _isRoomConnected) {
+      try { EnxRtc.disconnect(); } catch (_) {}
+      _hasDisconnected = true;
+    }
     super.dispose();
   }
 
+  // ─── Permissions ──────────────────────────────────────────────
   Future<void> _requestPermissions() async {
     final result = await [
       Permission.camera,
@@ -106,6 +120,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     );
   }
 
+  // ─── Join Room ──────────────────────────────────────────────
   Future<void> _joinRoom() async {
     if (_isEndingCall) return;
 
@@ -146,11 +161,14 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     }
   }
 
+  // ─── EnableX Events ──────────────────────────────────────────
   void _addEnxRtcEventHandlers() {
     EnxRtc.onRoomConnected = (map) {
       debugPrint("Room connected: $map");
-      if (mounted) setState(() => _isRoomConnected = true);
-      EnxRtc.publish();
+      if (mounted) {
+        setState(() => _isRoomConnected = true);
+        EnxRtc.publish();
+      }
     };
 
     EnxRtc.onPublishedStream = (map) {
@@ -163,38 +181,29 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       }
     };
 
-    // ✅ Only add remote streams
     EnxRtc.onStreamAdded = (map) {
       debugPrint("Stream added: $map");
       final id = _parseInt(map['streamId']);
       if (id != null && id != _localStreamId) {
-        // Subscribe to the stream
         EnxRtc.subscribe(id.toString());
       }
     };
 
-    // ✅ Set remote stream ID when subscribed
     EnxRtc.onSubscribedStream = (map) {
       debugPrint("Subscribed: $map");
       final id = _parseInt(map['streamId']);
       if (id != null && id != _localStreamId) {
-        setState(() {
-          _remoteStreamId = id;
-        });
+        setState(() => _remoteStreamId = id);
       }
     };
 
-    // Also listen to active talker list as fallback
     EnxRtc.onActiveTalkerList = (map) {
-      debugPrint("Active talkers: $map");
       final list = map['activeList'] as List?;
       if (list != null) {
         for (final item in list) {
           final id = _parseInt(item['streamId']);
           if (id != null && id != _localStreamId && _remoteStreamId == null) {
-            setState(() {
-              _remoteStreamId = id;
-            });
+            setState(() => _remoteStreamId = id);
           }
         }
       }
@@ -202,6 +211,8 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
     EnxRtc.onRoomDisConnected = (map) {
       debugPrint("Disconnected: $map");
+      _hasDisconnected = true;
+      _isRoomConnected = false;
       if (mounted) _endCall();
     };
 
@@ -212,24 +223,18 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
     EnxRtc.onAudioEvent = (map) {
       if (!mounted) return;
-      setState(() {
-        _isAudioMuted = map['msg'].toString() == "Audio Off";
-      });
+      setState(() => _isAudioMuted = map['msg'].toString() == "Audio Off");
     };
 
     EnxRtc.onVideoEvent = (map) {
       if (!mounted) return;
-      setState(() {
-        _isVideoMuted = map['msg'].toString() == "Video Off";
-      });
+      setState(() => _isVideoMuted = map['msg'].toString() == "Video Off");
     };
 
     EnxRtc.onUserDisConnected = (map) {
       final id = _parseInt(map['streamId']);
       if (id != null && id == _remoteStreamId) {
-        setState(() {
-          _remoteStreamId = null;
-        });
+        setState(() => _remoteStreamId = null);
       }
     };
   }
@@ -241,13 +246,45 @@ class _VideoCallScreenState extends State<VideoCallScreen>
     return null;
   }
 
+  // ─── End Call ────────────────────────────────────────────────
   void _endCall() {
     if (_isEndingCall) return;
     setState(() => _isEndingCall = true);
-    try { EnxRtc.disconnect(); } catch (_) {}
-    if (mounted) Navigator.pop(context);
+
+    // Add the EndCall event to the BLoC
+    try {
+      _callBloc.add(EndCall(widget.roomId, widget.callId));
+    } catch (e) {
+      debugPrint("BLoC end call error: $e");
+    }
+
+    // Disconnect from SDK only if room is connected and not already disconnected
+    if (!_hasDisconnected && _isRoomConnected) {
+      try {
+        EnxRtc.disconnect();
+        _hasDisconnected = true;
+        _isRoomConnected = false;
+      } catch (e) {
+        debugPrint("Disconnect error: $e");
+      }
+    }
+
+    // Force pop after timeout (3 seconds)
+    _endCallTimeoutTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    });
   }
 
+  void _callFullyEnded() {
+    _endCallTimeoutTimer?.cancel();
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  // ─── Controls ─────────────────────────────────────────────────
   void _toggleAudio() {
     EnxRtc.muteSelfAudio(!_isAudioMuted);
     setState(() => _isAudioMuted = !_isAudioMuted);
@@ -264,6 +301,7 @@ class _VideoCallScreenState extends State<VideoCallScreen>
 
   void _toggleSpeaker() => setState(() => _isSpeakerOn = !_isSpeakerOn);
 
+  // ─── UI ──────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     if (!_permissionChecked) {
@@ -281,111 +319,122 @@ class _VideoCallScreenState extends State<VideoCallScreen>
       );
     }
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Remote video (full screen)
-          if (_remoteStreamId != null)
-            Positioned.fill(
-              child: EnxPlayerWidget(
-                _remoteStreamId!,
-                local: false,
-                width: MediaQuery.of(context).size.width.toInt(),
-                height: MediaQuery.of(context).size.height.toInt(),
-                mScalingType: ScalingType.SCALE_ASPECT_FIT,
-              ),
-            )
-          else
-            const Center(
-              child: Text(
-                "Waiting for participant...",
-                style: TextStyle(color: Colors.white, fontSize: 18),
-              ),
-            ),
-
-          // Local preview (small)
-          if (_isRoomConnected && _localStreamId != null)
-            Positioned(
-              top: 70,
-              right: 16,
-              child: Container(
-                width: 120,
-                height: 170,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+    return BlocProvider.value(
+      value: _callBloc,
+      child: BlocListener<CallBloc, CallState>(
+        listener: (context, state) {
+          if (state is CallEnded || state is CallError) {
+            _callFullyEnded();
+          }
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              // Remote video
+              if (_remoteStreamId != null)
+                Positioned.fill(
                   child: EnxPlayerWidget(
-                    _localStreamId!, // use the actual local stream ID
-                    local: true,
+                    _remoteStreamId!,
+                    local: false,
+                    width: MediaQuery.of(context).size.width.toInt(),
+                    height: MediaQuery.of(context).size.height.toInt(),
+                    mScalingType: ScalingType.SCALE_ASPECT_FIT,
+                  ),
+                )
+              else
+                const Center(
+                  child: Text(
+                    "Waiting for participant...",
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                ),
+
+              // Local preview
+              if (_isRoomConnected && _localStreamId != null)
+                Positioned(
+                  top: 70,
+                  right: 16,
+                  child: Container(
                     width: 120,
                     height: 170,
-                    mScalingType: ScalingType.SCALE_ASPECT_BALANCED,
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: EnxPlayerWidget(
+                        _localStreamId!,
+                        local: true,
+                        width: 120,
+                        height: 170,
+                        mScalingType: ScalingType.SCALE_ASPECT_BALANCED,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Top bar
+              Positioned(
+                top: 40,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: _endCall,
+                      ),
+                      Text(
+                        widget.appointment.patientName,
+                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      // ✅ Only one end-call button – red
+                      IconButton(
+                        icon: const Icon(Icons.call_end, color: Colors.red, size: 32),
+                        onPressed: _endCall,
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
 
-          // Top bar
-          Positioned(
-            top: 40,
-            left: 0,
-            right: 0,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: _endCall,
-                  ),
-                  Text(
-                    widget.appointment.patientName,
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.call_end, color: Colors.red, size: 32),
-                    onPressed: _endCall,
-                  ),
-                ],
+              // Bottom controls (no duplicate red button)
+              Positioned(
+                bottom: 30,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _controlButton(Icons.mic, _isAudioMuted, _toggleAudio),
+                    _controlButton(Icons.videocam, _isVideoMuted, _toggleVideo),
+                    // Removed the call_end button from here (only top bar has it)
+                    _controlButton(Icons.switch_camera, false, _toggleCamera),
+                    _controlButton(Icons.volume_up, _isSpeakerOn, _toggleSpeaker),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-
-          // Bottom controls
-          Positioned(
-            bottom: 30,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _controlButton(Icons.mic, _isAudioMuted, _toggleAudio),
-                _controlButton(Icons.videocam, _isVideoMuted, _toggleVideo),
-                _controlButton(Icons.call_end, false, _endCall, isRed: true),
-                _controlButton(Icons.switch_camera, false, _toggleCamera),
-                _controlButton(Icons.volume_up, _isSpeakerOn, _toggleSpeaker),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _controlButton(IconData icon, bool isActive, VoidCallback onTap, {bool isRed = false}) {
     return CircleAvatar(
-      radius: isRed ? 32 : 28,
-      backgroundColor: isRed ? Colors.red : Colors.black54,
+      radius: 28,
+      backgroundColor: Colors.black54,
       child: IconButton(
         icon: Icon(
           icon,
-          color: isRed ? Colors.white : (isActive ? Colors.white : Colors.grey),
+          color: isActive ? Colors.white : Colors.grey,
         ),
         onPressed: onTap,
       ),

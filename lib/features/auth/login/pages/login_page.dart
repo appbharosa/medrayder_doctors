@@ -1,3 +1,4 @@
+import 'package:doctors/features/auth/login/pages/terms_page.dart';
 import 'package:doctors/features/auth/login/pages/widgets/user_type.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -285,7 +286,10 @@ class _LoginPageState extends State<LoginPage> {
                                 Center(
                                   child: GestureDetector(
                                     onTap: () {
-                                     // _showTermsDialog(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const TermsPage()),
+                                      );
                                     },
                                     child: RichText(
                                       text: TextSpan(

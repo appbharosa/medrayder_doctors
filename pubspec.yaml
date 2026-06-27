@@ -52,6 +52,8 @@ dependencies:
   get: ^4.6.6
   flutter_native_splash: ^2.4.0
   enx_uikit_flutter: ^2.1.2
+  image_picker: ^1.0.7
+  upgrader: ^13.5.0
 
 dependency_overrides:
   js: ^0.7.2

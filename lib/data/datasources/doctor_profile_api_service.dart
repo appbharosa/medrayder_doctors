@@ -25,21 +25,27 @@ class DoctorProfileApiService {
 
   Future<Map<String, dynamic>> updateProfile(UpdateProfileRequestModel request) async {
     try {
+      final formData = request.toFormData();
+
       final response = await dio.post(
         AppUrls.updateProfile,
-        data: request.toJson(),
+        data: formData,
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+          },
+        ),
       );
+
       if (response.statusCode == 200 && response.data['status'] == 200) {
         return response.data as Map<String, dynamic>;
       } else {
         throw Exception(response.data['message'] ?? 'Failed to update profile');
       }
     } on DioException catch (e) {
-      throw _handleError(e);
+      throw Exception(_handleError(e));
     }
-  }
-
-  String _handleError(DioException error) {
+  }  String _handleError(DioException error) {
     if (error.response != null) {
       return error.response?.data['message'] ?? 'Server error occurred';
     } else {

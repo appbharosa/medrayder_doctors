@@ -32,9 +32,12 @@ class CallApiService {
     print('🔴 URL: ${AppUrls.endCall}/$roomId');
 
     try {
-      // ✅ Only URL – no body (room_id already in path)
       final response = await dio.delete(
         '${AppUrls.endCall}/$roomId',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 10),
+          sendTimeout: const Duration(seconds: 10),
+        ),
       );
       print('🔴 END CALL RESPONSE: status=${response.statusCode}');
       print('🔴 END CALL RESPONSE DATA: ${response.data}');
@@ -44,10 +47,10 @@ class CallApiService {
         throw Exception('Failed to end call: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      // ... error logging ...
+      print('❌ END CALL DIO ERROR: $e');
       throw _handleError(e);
     } catch (e, stack) {
-      // ...
+      print('❌ END CALL UNKNOWN ERROR: $e');
       rethrow;
     }
   }

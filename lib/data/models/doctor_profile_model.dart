@@ -1,30 +1,26 @@
 import 'package:json_annotation/json_annotation.dart';
 
-part 'doctor_profile_model.g.dart';
 
-@JsonSerializable()
 class DoctorProfileModel {
   final int id;
-  @JsonKey(name: 'unique_id')
   final String uniqueId;
   final String name;
-  final String mobile; // will be parsed from int
+  final String mobile;
   final String specialization;
   final String description;
-  @JsonKey(name: 'offline_fee')
   final int offlineFee;
-  @JsonKey(name: 'online_fee')
   final int onlineFee;
-  @JsonKey(name: 'consult_type')
   final String consultType;
   final String image;
-  @JsonKey(name: 'profile_image')
   final String profileImage;
   final int status;
-  @JsonKey(name: 'created_on')
   final String createdOn;
-  @JsonKey(name: 'modified_on')
   final String modifiedOn;
+  // New fields
+  final int exp;
+  final String qualification;
+  final String openTime;
+  final String closeTime;
 
   DoctorProfileModel({
     required this.id,
@@ -41,10 +37,13 @@ class DoctorProfileModel {
     required this.status,
     required this.createdOn,
     required this.modifiedOn,
+    required this.exp,
+    required this.qualification,
+    required this.openTime,
+    required this.closeTime,
   });
 
   factory DoctorProfileModel.fromJson(Map<String, dynamic> json) {
-    // Manually parse mobile as String to handle int
     final mobileValue = json['mobile'];
     final mobileString = mobileValue?.toString() ?? '';
     return DoctorProfileModel(
@@ -62,6 +61,10 @@ class DoctorProfileModel {
       status: json['status'] ?? 0,
       createdOn: json['created_on'] ?? '',
       modifiedOn: json['modified_on'] ?? '',
+      exp: json['exp'] ?? 0,
+      qualification: json['qualification'] ?? '',
+      openTime: json['open_time']?.toString() ?? '',
+      closeTime: json['close_time']?.toString() ?? '',
     );
   }
 
@@ -80,5 +83,9 @@ class DoctorProfileModel {
     'status': status,
     'created_on': createdOn,
     'modified_on': modifiedOn,
+    'exp': exp,
+    'qualification': qualification,
+    'open_time': openTime,
+    'close_time': closeTime,
   };
 }

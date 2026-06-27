@@ -1,26 +1,45 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
+
 class UpdateProfileRequestModel {
-  final String name;
-  final int exp;
-  final String description;
-  final String consultType; // field name matches JSON key exactly (snake_case)
-  final int onlineFee;
-  final int offlineFee;
+  final String? name;
+  final int? exp;
+  final String? qualification;
+  final String? description;
+  final String? consultType;
+  final int? onlineFee;
+  final int? offlineFee;
+  final String? openTime;
+  final String? closeTime;
+  final File? image;
 
   UpdateProfileRequestModel({
-    required this.name,
-    required this.exp,
-    required this.description,
-    required this.consultType,
-    required this.onlineFee,
-    required this.offlineFee,
+    this.name,
+    this.exp,
+    this.qualification,
+    this.description,
+    this.consultType,
+    this.onlineFee,
+    this.offlineFee,
+    this.openTime,
+    this.closeTime,
+    this.image,
   });
 
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'exp': exp,
-    'description': description,
-    'consult_type': consultType,   // ✅ matches API expected key
-    'online_fee': onlineFee,       // ✅ matches API expected key
-    'offline_fee': offlineFee,     // ✅ matches API expected key
-  };
+  FormData toFormData() {
+    final map = <String, dynamic>{};
+    if (name != null) map['name'] = name;
+    if (exp != null) map['exp'] = exp;
+    if (qualification != null) map['qualification'] = qualification;
+    if (description != null) map['description'] = description;
+    if (consultType != null) map['consult_type'] = consultType;
+    if (onlineFee != null) map['online_fee'] = onlineFee;
+    if (offlineFee != null) map['offline_fee'] = offlineFee;
+    if (openTime != null) map['open_time'] = openTime;
+    if (closeTime != null) map['close_time'] = closeTime;
+    if (image != null) {
+      map['image'] = MultipartFile.fromFileSync(image!.path);
+    }
+    return FormData.fromMap(map);
+  }
 }

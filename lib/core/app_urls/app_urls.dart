@@ -4,6 +4,8 @@ class AppUrls {
   static const String otpVerification= "doctor/otp-verification";
   static const String resendOtp="doctor/resend-otp";
   static const String dashboard="doctor/dashboard";
+  static const String availability="doctor/update-availability";
+  static const String terms="doctor/get-pages/terms";
   static const String bankDetails = 'doctor/bank-details';
   static const String addBankDetails = 'doctor/bank-details';
   static const String updateBankDetails = 'doctor/bank-details';

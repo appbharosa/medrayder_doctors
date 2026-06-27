@@ -15,50 +15,23 @@ import 'features/auth/login/pages/login_page.dart';
 import 'features/auth/otp/bloc/otp_bloc.dart';
 import 'features/home/home_page/home_page.dart';
 import 'firebase_options.dart';
+import 'package:get/get.dart' hide Response; // if you're using GetX, else import as GetMaterialApp
+import 'package:upgrader/upgrader.dart'; // <-- import upgrader
 
 
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
-// void _setupFcmTokenRefresh() {
-//   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-//     final user = UserManager().currentUser;
-//     if (user != null) {
-//       final deviceType = Platform.isAndroid ? 'android' : 'ios';
-//       final dio = DioClient().dio; // or get from GetIt
-//       try {
-//         await dio.post(
-//           AppUrls.fcmToken,
-//           data: {
-//             'device_token': newToken,
-//             'device_type': deviceType,
-//           },
-//         );
-//         print("✅ FCM token refreshed: $newToken");
-//       } catch (e) {
-//         print("❌ FCM token refresh failed: $e");
-//       }
-//     }
-//   });
-// }
-
-// Call this in main() after Firebase initialization
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Initialize push notifications (FCM)
   await FirebaseNotificationService.initialize();
-
-  // Initialize dependency injection
   await di.init();
-
-  // Load user session from secure storage
   await di.sl<UserManager>().loadUser();
 
   runApp(const MyApp());
@@ -76,14 +49,24 @@ class MyApp extends StatelessWidget {
       ],
       child: GetMaterialApp(
         navigatorKey: navigatorKey,
-        scaffoldMessengerKey: scaffoldMessengerKey, // 👈 added for global snackbars
+        scaffoldMessengerKey: scaffoldMessengerKey,
         title: 'Doctor App',
         debugShowCheckedModeBanner: false,
         home: _getInitialScreen(),
-        // Optional: add routes if needed
-        // routes: {
-        //   '/home': (context) => const HomePage(),
-        // },
+        // 👇 Integrate Upgrader
+        builder: (context, child) {
+          return UpgradeAlert(
+            upgrader: Upgrader(
+              debugLogging: true,                    // logs to console
+              debugDisplayAlways: false,             // only when update available
+              durationUntilAlertAgain: const Duration(days: 1), // wait 1 day after "Later"
+              countryCode: 'in',                     // India Play Store
+              // minAppVersion: '2.0.0',            // optional: force if below
+            ),
+            dialogStyle: UpgradeDialogStyle.material, // ✅ dialogStyle goes here
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
       ),
     );
   }

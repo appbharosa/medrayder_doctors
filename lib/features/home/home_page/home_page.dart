@@ -1,4 +1,5 @@
 import 'package:doctors/features/bank_details/pages/bank_details_page.dart';
+import 'package:doctors/features/booking_history/pages/booking_history_screen.dart';
 import 'package:doctors/features/profile/pages/doctor_profile_page.dart';
 import 'package:doctors/features/wallet/pages/wallet_history_page.dart';
 import 'package:flutter/material.dart';
@@ -20,8 +21,6 @@ import '../availability_bloc/availability_state.dart';
 import '../bloc/dashboard_bloc.dart';
 import '../bloc/dashboard_event.dart';
 import '../bloc/dashboard_state.dart';
-
-
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -384,7 +383,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   _modernCard(
                     title: "Appointments",
-                    value: data.result.appointmentsCount.toString(),
+                  //  value: data.result.appointmentsCount.toString(),
                     icon: Icons.calendar_month_rounded,
                     color: const Color(0xFF0A8FDC),
                     onTap: () {
@@ -397,25 +396,45 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
                   _modernCard(
-                    title: "Patients",
-                    value: data.result.patientsThisMonth.toString(),
+                    title: "Booking History",
                     icon: Icons.people_alt_rounded,
                     color: const Color(0xFF4CAF50),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const BookingHistoryScreen(),
+                        ),
+                      );
+                    },
                   ),
                   _modernCard(
-                    title: "Prescription",
-                    value: "120+",
-                    icon: Icons.description_rounded,
+                    title: "Profile",
+
+                    icon: Icons.person,
                     color: const Color(0xFFFF9800),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DoctorProfilePage(),
+                        ),
+                      );
+                    },
                   ),
                   _modernCard(
-                    title: "Reports",
-                    value: "85+",
-                    icon: Icons.analytics_rounded,
+                    title: "Wallet",
+
+                    icon: Icons.wallet,
                     color: const Color(0xFFE91E63),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WalletHistoryPage(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -512,7 +531,6 @@ class _HomePageState extends State<HomePage> {
   // ─── Helper Widgets (unchanged) ───
   Widget _modernCard({
     required String title,
-    required String value,
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
@@ -558,14 +576,7 @@ class _HomePageState extends State<HomePage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
+
                 const SizedBox(height: 5),
                 Text(
                   title,

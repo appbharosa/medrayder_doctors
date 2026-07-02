@@ -184,7 +184,7 @@ class _LoginPageState extends State<LoginPage> {
                                     Expanded(
                                       child: _buildTypeContainer(
                                         type: UserType.offline,
-                                        label: "Individual",
+                                        label: "Hospital",
                                         isSelected: _selectedType == UserType.offline,
                                       ),
                                     ),
@@ -192,7 +192,7 @@ class _LoginPageState extends State<LoginPage> {
                                     Expanded(
                                       child: _buildTypeContainer(
                                         type: UserType.online,
-                                        label: "Hospital",
+                                        label: "Individual",
                                         isSelected: _selectedType == UserType.online,
                                       ),
                                     ),

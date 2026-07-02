@@ -57,13 +57,13 @@ class MyApp extends StatelessWidget {
         builder: (context, child) {
           return UpgradeAlert(
             upgrader: Upgrader(
-              debugLogging: true,                    // logs to console
-              debugDisplayAlways: false,             // only when update available
-              durationUntilAlertAgain: const Duration(days: 1), // wait 1 day after "Later"
-              countryCode: 'in',                     // India Play Store
-              // minAppVersion: '2.0.0',            // optional: force if below
+              debugLogging: true,
+              debugDisplayAlways: false,
+              durationUntilAlertAgain: const Duration(days: 1),
+              countryCode: 'in',
+              // minAppVersion: '2.0.0',
             ),
-            dialogStyle: UpgradeDialogStyle.material, // ✅ dialogStyle goes here
+            dialogStyle: UpgradeDialogStyle.material,
             child: child ?? const SizedBox.shrink(),
           );
         },

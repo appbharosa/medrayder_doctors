@@ -34,10 +34,10 @@ class CallApiService {
     try {
       final response = await dio.delete(
         '${AppUrls.endCall}/$roomId',
-        options: Options(
-          receiveTimeout: const Duration(seconds: 10),
-          sendTimeout: const Duration(seconds: 10),
-        ),
+        // options: Options(
+        //   receiveTimeout: const Duration(seconds: 10),
+        //   sendTimeout: const Duration(seconds: 10),
+        // ),
       );
       print('🔴 END CALL RESPONSE: status=${response.statusCode}');
       print('🔴 END CALL RESPONSE DATA: ${response.data}');

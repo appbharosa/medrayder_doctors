@@ -22,18 +22,25 @@ class DashboardResponseModel {
 class DashboardResultModel {
   @JsonKey(name: 'user_info')
   final UserInfoModel userInfo;
+
   @JsonKey(name: 'quick_actions')
   final List<QuickActionModel> quickActions;
+
   @JsonKey(name: 'today_appointments')
   final List<dynamic> todayAppointments;
+
   @JsonKey(name: 'appointments_count')
   final int appointmentsCount;
+
   @JsonKey(name: 'today_date')
   final String todayDate;
+
   @JsonKey(name: 'today_ratings')
   final int todayRatings;
+
   @JsonKey(name: 'earning_this_month')
   final int earningThisMonth;
+
   @JsonKey(name: 'patients_this_month')
   final int patientsThisMonth;
 
@@ -57,8 +64,10 @@ class DashboardResultModel {
 class UserInfoModel {
   @JsonKey(name: 'doctor_name')
   final String doctorName;
+
   @JsonKey(name: 'speciality_id')
   final String specialityId;
+
   final String image;
 
   UserInfoModel({

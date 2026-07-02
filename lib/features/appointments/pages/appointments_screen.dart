@@ -2,11 +2,14 @@ import 'package:doctors/features/appointments/pages/video_call_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/app_colors/app_colors.dart';
 import '../../../core/di/injection.dart' as di;
 import '../../../core/manager/user_manager.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/models/create_room_request_model.dart';
 import '../../../data/models/join_room_request_model.dart';
+import '../../prescription/pages/prescription_detail_screen.dart';
+import '../../prescription/pages/prescription_screen.dart';
 import '../bloc/appointment_bloc.dart';
 import '../bloc/appointment_event.dart';
 import '../bloc/appointment_state.dart';
@@ -607,31 +610,59 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () =>
-                            _showCancelConfirmation(context, appointment),
+                        onPressed: () {
+                          final user = UserManager().currentUser;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PrescriptionScreen(
+                                bookingId: appointment.bookingId,
+                                doctorType: user?.type ?? 'online',
+                              ),
+                            ),
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade500,
+                          backgroundColor: AppColors.primaryColor,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        icon: const Icon(
-                          Icons.cancel_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
+                        icon: const Icon(Icons.medical_services, color: Colors.white, size: 20),
                         label: const Text(
-                          "Cancel",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          "Prescription",
+                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
+
+                    // Expanded(
+                    //   child: ElevatedButton.icon(
+                    //     onPressed: () =>
+                    //         _showCancelConfirmation(context, appointment),
+                    //     style: ElevatedButton.styleFrom(
+                    //       backgroundColor: Colors.red.shade500,
+                    //       elevation: 0,
+                    //       padding: const EdgeInsets.symmetric(vertical: 14),
+                    //       shape: RoundedRectangleBorder(
+                    //         borderRadius: BorderRadius.circular(14),
+                    //       ),
+                    //     ),
+                    //     icon: const Icon(
+                    //       Icons.cancel_rounded,
+                    //       color: Colors.white,
+                    //       size: 18,
+                    //     ),
+                    //     label: const Text(
+                    //       "Cancel",
+                    //       style: TextStyle(
+                    //         color: Colors.white,
+                    //         fontSize: 14,
+                    //         fontWeight: FontWeight.w600,
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
 
@@ -642,28 +673,25 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   width: double.infinity,
                   child: OutlinedButton(
                     onPressed: () {
-                      _showSnackBar(
+                      final user = UserManager().currentUser;
+                      Navigator.push(
                         context,
-                        'Opening details for ${appointment.bookingId}',
+                        MaterialPageRoute(
+                          builder: (_) => PrescriptionDetailsScreen(
+                            bookingId: appointment.bookingId,
+                            doctorType: user?.type ?? 'online',
+                          ),
+                        ),
                       );
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: const BorderSide(
-                        color: Color(0xff1565C0),
-                        width: 1.3,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                      side: const BorderSide(color: Color(0xff1565C0), width: 1.3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     child: const Text(
                       "View Details",
-                      style: TextStyle(
-                        color: Color(0xff1565C0),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Color(0xff1565C0), fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                   ),
                 ),
